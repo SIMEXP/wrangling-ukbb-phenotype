@@ -15,6 +15,7 @@ To expand this tool, add more  information to `info` with information
 from Data_fields xlsx file (provided by SJ's lab and requires DUA).
 
 """
+from pathlib import Path
 import pandas as pd
 import json
 import argparse
@@ -104,9 +105,12 @@ def read_ukbb_data(data_file, info_label):
 if __name__ == '__main__':
     # use argparse to get datafile
     parser = argparse.ArgumentParser(description='Extract ukbb data')
-    parser.add_argument('datafile', type=str, help='ukbb data file')
+    parser.add_argument('datafile', type=Path, help='ukbb data file')
+    parser.add_argument('output', type=Path, help='output directory')
+
     args = parser.parse_args()
     data_file = args.datafile
+    output_dir = args.output
 
     curated_data = []
     curated_meta = {}
@@ -116,6 +120,6 @@ if __name__ == '__main__':
         curated_meta.update(meta_data)
     curated_data = pd.concat(curated_data, axis=1)
 
-    curated_data.to_csv('outputs/ukbb_pheno.tsv', sep='\t')
-    with open('outputs/ukbb_pheno.json', 'w') as f:
+    curated_data.to_csv(output_dir / 'ukbb_pheno.tsv', sep='\t')
+    with open(output_dir / 'ukbb_pheno.json', 'w') as f:
         json.dump(curated_meta, f, indent=2)
