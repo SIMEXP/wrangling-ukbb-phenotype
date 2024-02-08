@@ -2,10 +2,10 @@
 
 Author: Hao-Ting Wang; last edit 2024-02-02
 
-All input stored in `data/` folder. The content of `data` is not
+All input stored in `data/ukbb` folder. The content of `data` is not
 included in the repository.
 
-Labels are cureated from the ukbb website and saved to `data/`.
+Labels are cureated from the ukbb website and saved to `data/ukbb`.
 This is public information hence it is not included in the repository.
 
 data_file is provided by SJ's lab and requires DUA,
