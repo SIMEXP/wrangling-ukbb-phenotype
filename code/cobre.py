@@ -46,15 +46,12 @@ def process_data(csv_file_p, output_json_p):
 
 
 if __name__ == "__main__":
-    # Set up argument parsing
     parser = argparse.ArgumentParser(
         description="Process COBRE CSV data and output to JSON"
     )
     parser.add_argument("datafile", type=Path, help="Path to the input CSV data file")
     parser.add_argument("output", type=Path, help="Path to the output JSON file")
 
-    # Parse arguments
     args = parser.parse_args()
 
-    # Call the processing function with the command-line arguments
     process_data(args.datafile, args.output)
