@@ -37,7 +37,7 @@ info = {
         'labels': 'coding10.tsv',  # download from ukbb website
         'instance':{  # curated from ukbb website
             2: {
-                'name': 'init',
+                'name': '',
                 'description': 'first imaging visit',
             },
             3: {
@@ -72,8 +72,12 @@ def read_ukbb_data(data_file, info_label):
             descriptions.append(
                 f'{info[info_label]["description"]}; {v["description"]}'
             )
+            if v['name']:
+                name = f'{info_label}_{v["name"]}'
+            else:
+                name = info_label
             names.append(
-                f'{info_label}_{v["name"]}'
+                name
             )
     else:
         fids.append(f'f.{info[info_label]["id"]}.0.0')
@@ -82,7 +86,7 @@ def read_ukbb_data(data_file, info_label):
 
     if 'labels' in info[info_label]:
         labels = pd.read_csv(
-            f'data/{info[info_label]["labels"]}', sep='\t', index_col=0
+            f'data/ukbb/{info[info_label]["labels"]}', sep='\t', index_col=0
         )
         labels = labels.to_dict()['meaning']
 
@@ -99,6 +103,7 @@ def read_ukbb_data(data_file, info_label):
     data = pd.read_csv(
         data_file, sep='\t', na_values='NA', index_col=0, usecols=columns)
     data.columns = names
+    data.index.name = 'participant_id'
     return data, meta_data
 
 
