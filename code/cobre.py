@@ -1,6 +1,6 @@
 """Load COBRE data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-02-11
+Author: Natasha Clarke; last edit 2024-02-13
 
 All input stored in `data/cobre` folder. The content of `data` is not
 included in the repository.
@@ -15,8 +15,30 @@ import json
 import argparse
 from pathlib import Path
 
+# Define metadata
+metadata = {
+    "participant_id": {
+        "original_field_name": "[none given]",
+        "description": "Unique identifier for each participant",
+    },
+    "age": {
+        "original_field_name": "Current Age",
+        "description": "Age of the participant in years",
+    },
+    "sex": {"original_field_name": "Gender", "description": "Sex of the participant"},
+    "site": {
+        "original_field_name": "[none given]",
+        "description": "Site of imaging data collection",
+    },
+    "diagnosis": {
+        "original_field_name": "Subject Type",
+        "description": "Diagnosis of the participant",
+        "labels": {"CON": "Control", "SZ": "Patient"},
+    },
+}
 
-def process_data(csv_file_p, output_json_p):
+
+def process_data(csv_file_p, output_p, metadata):
     # Load the CSV and filter out any subjects who disenrolled
     df = pd.read_csv(csv_file_p, index_col=0)
     df = df[df["Current Age"] != "Disenrolled"]
@@ -28,21 +50,21 @@ def process_data(csv_file_p, output_json_p):
     # Process the data
     df["participant_id"] = df["participant_id"].astype(str)
     df["age"] = df["Current Age"].astype(float)
-    df["sex"] = df["Gender"].map({"Female": 0, "Male": 1})
+    df["sex"] = df["Gender"].map({"Female": "female", "Male": "male"})
     df["site"] = "cobre"  # There is only one site, and no name provided
     df["diagnosis"] = df["Subject Type"].map({"Control": "CON", "Patient": "SZ"})
 
     # Select columns
     df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
 
-    # Convert to dictionary
-    data_dict = df.to_dict(orient="records")
+    # Output tsv file
+    df.to_csv(output_p / "cobre_pheno.tsv", sep="\t", index=False)
 
-    # Output to JSON
-    with open(output_json_p / "cobre_pheno.json", "w") as f:
-        json.dump(data_dict, f, indent=2)
+    # Output metadata to json
+    with open(output_p / "cobre_pheno.json", "w") as f:
+        json.dump(metadata, f, indent=2)
 
-    print(f"Data has been processed and output to {output_json_p}")
+    print(f"Data and metadata have been processed and output to {output_p}")
 
 
 if __name__ == "__main__":
@@ -54,4 +76,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    process_data(args.datafile, args.output)
+    process_data(args.datafile, args.output, metadata)
