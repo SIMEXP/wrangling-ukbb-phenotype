@@ -18,7 +18,7 @@ from pathlib import Path
 # Define metadata
 metadata = {
     "participant_id": {
-        "original_field_name": "column header is empty in original data",
+        "original_field_name": "Column header is empty in original data",
         "description": "Unique identifier for each participant",
     },
     "age": {
@@ -31,13 +31,13 @@ metadata = {
         "levels": {"male": "male", "female": "female"},
     },
     "site": {
-        "original_field_name": "none given - in the case of single site study, the site name is the dataset name",
+        "original_field_name": "None given - in the case of single site study, the site name is the dataset name",
         "description": "Site of imaging data collection",
     },
     "diagnosis": {
         "original_field_name": "Subject Type",
         "description": "Diagnosis of the participant",
-        "levels": {"CON": "Control", "SZ": "Patient"},
+        "levels": {"CON": "Control", "SCHZ": "Patient [schizophrenia]"},
     },
 }
 
@@ -56,7 +56,7 @@ def process_data(csv_file_p, output_p, metadata):
     df["age"] = df["Current Age"].astype(float)
     df["sex"] = df["Gender"].map({"Female": "female", "Male": "male"})
     df["site"] = "cobre"  # There is only one site, and no name provided
-    df["diagnosis"] = df["Subject Type"].map({"Control": "CON", "Patient": "SZ"})
+    df["diagnosis"] = df["Subject Type"].map({"Control": "CON", "Patient": "SCHZ"})
 
     # Select columns
     df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
