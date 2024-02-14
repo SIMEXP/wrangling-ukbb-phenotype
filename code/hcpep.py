@@ -42,7 +42,7 @@ metadata = {
     "diagnosis": {
         "original_field_name": "phenotype",
         "description": "Diagnosis of the participant",
-        "levels": {"CON": "Control", "PSYC": "Patient [psychosis]"},
+        "levels": {"CON": "control", "PSYC": "psychosis"},
     },
 }
 
