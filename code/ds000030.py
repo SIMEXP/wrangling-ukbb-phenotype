@@ -75,10 +75,10 @@ def process_data(csv_file_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process ds000030 CSV data and output to JSON"
+        description="Process ds000030 phenotype data and output to TSV and JSON"
     )
     parser.add_argument("datafile", type=Path, help="Path to the input CSV data file")
-    parser.add_argument("output", type=Path, help="Path to the output JSON file")
+    parser.add_argument("output", type=Path, help="Path to the output directory")
 
     args = parser.parse_args()
 
