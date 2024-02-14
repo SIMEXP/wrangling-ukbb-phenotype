@@ -37,7 +37,7 @@ metadata = {
     "diagnosis": {
         "original_field_name": "Subject Type",
         "description": "Diagnosis of the participant",
-        "levels": {"CON": "Control", "SCHZ": "Patient [schizophrenia]"},
+        "levels": {"CON": "control", "SCHZ": "schizophrenia"},
     },
 }
 
