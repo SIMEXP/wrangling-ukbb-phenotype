@@ -39,10 +39,10 @@ metadata = {
         "original_field_name": "diagnosis",
         "description": "Diagnosis of the participant",
         "levels": {
-            "CON": "CONTROL",
-            "SCHZ": "SCHZ [schizophrenia]",
-            "BIPOLAR": "BIPOLAR [bipolar disorder]",
-            "ADHD": "ADHD",
+            "CON": "control",
+            "SCHZ": "schizophrenia",
+            "BIPOLAR": "bipolar disorder",
+            "ADHD": "Attention deficit hyperactivity disorder (ADHD)",
         },
     },
 }
