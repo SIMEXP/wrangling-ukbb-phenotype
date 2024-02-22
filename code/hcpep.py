@@ -83,7 +83,7 @@ def process_data(txt_file_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process HCP-EP phenotype data and output to TSV JSON"
+        description="Process HCP-EP phenotype data and output to TSV and JSON"
     )
     parser.add_argument("datafile", type=Path, help="Path to the input TXT data file")
     parser.add_argument("output", type=Path, help="Path to the output directory")
