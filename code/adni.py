@@ -60,7 +60,7 @@ def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
     df = df[["participant_id", "age", "sex", "site"]]  # Diagnosis to be added
 
     # Sort df
-    df = df.sort_values(by="participant_id")
+    df = df.sort_values(by=["participant_id", "age"])
 
     # Output tsv file
     df.to_csv(output_p / "adni_pheno.tsv", sep="\t", index=False)
