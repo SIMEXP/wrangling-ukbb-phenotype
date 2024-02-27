@@ -2,7 +2,7 @@
 
 * the UCLA Consortium for Neuropsychiatric Phenomics LA5c Study
 
-Author: Natasha Clarke; last edit 2024-02-14
+Author: Natasha Clarke; last edit 2024-02-27
 
 All input stored in `data/ds000030` folder. The content of `data` is not
 included in the repository.
@@ -50,7 +50,10 @@ metadata = {
 
 def process_data(csv_file_p, output_p, metadata):
     # Load the CSV
-    df = pd.read_csv(csv_file_p)
+    df = pd.read_csv(csv_file_p, dtype=str)
+
+    # Remove sub- from participant id
+    df["participant_id"] = df["participant_id"].str.replace("sub-", "", regex=False)
 
     # Process the data
     df["age"] = df["age"].astype(float)
