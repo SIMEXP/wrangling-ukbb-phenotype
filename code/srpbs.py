@@ -71,6 +71,9 @@ def process_data(csv_file_p, output_p, metadata):
     # Load the CSV
     df = pd.read_csv(csv_file_p, sep="\t")
 
+    # Remove sub- from participant id
+    df["participant_id"] = df["participant_id"].str.replace("sub-", "", regex=False)
+
     # Process the data
     df["age"] = df["age"].astype(float)
     df["sex"] = df["sex"].map({2: "female", 1: "male"})
