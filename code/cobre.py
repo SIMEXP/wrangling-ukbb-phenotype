@@ -43,13 +43,12 @@ metadata = {
 
 
 def process_data(csv_file_p, output_p, metadata):
-    # Load the CSV and filter out any subjects who disenrolled
-    df = pd.read_csv(csv_file_p, index_col=0)
-    df = df[df["Current Age"] != "Disenrolled"]
+    # Load the CSV and rename first column
+    df = pd.read_csv(csv_file_p, dtype=str)
+    df.rename(columns={df.columns[0]: "participant_id"}, inplace=True)
 
-    # Reset the index to make it a column, and rename it
-    df.reset_index(inplace=True)
-    df = df.rename(columns={df.columns[0]: "participant_id"})
+    # Filter out any subjects who disenrolled
+    df = df[df["Current Age"] != "Disenrolled"]
 
     # Process the data
     df["participant_id"] = df["participant_id"].astype(str)
