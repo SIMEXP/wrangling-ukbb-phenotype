@@ -59,10 +59,11 @@ def create_master(rest_qc_p, datasets, which_qc_col):
         df = filter_pheno_qc(qc_df, pheno_df, which_qc_col, dataset)
         master_df = pd.concat([master_df, df], ignore_index=True)
 
-    # Save master DataFrame to a file
-    master_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
+    return master_df
 
-    print(f"Data have been processed and output to {output_p}")
+
+def filter_diagnoses(df, diagnoses):
+    return df[df["diagnosis"].isin(diagnoses)]
 
 
 if __name__ == "__main__":
@@ -76,14 +77,26 @@ if __name__ == "__main__":
     parser.add_argument(
         "--which_qc_col", type=str, help="Column for filtering QC. Default=pass_func_qc"
     )
+    parser.add_argument(
+        "--diagnoses", nargs="+", type=str, help="Diagnoses of interest"
+    )
 
     args = parser.parse_args()
     datasets = args.datasets
-    which_qc_col = args.which_qc_col if args.which_qc_col else "pass_func_qc"
+    which_qc_col = args.which_qc_col or "pass_func_qc"
+    diagnoses = args.diagnoses if args.diagnoses else None
 
     root_p = Path(args.root)
     pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
     rest_qc_p = Path(root_p / "qc_output/rest_df.tsv")
     output_p = Path(root_p / "wrangling-phenotype/outputs")
 
-    create_master(rest_qc_p, datasets, which_qc_col)
+    master_df = create_master(rest_qc_p, datasets, which_qc_col)
+    sub_df = filter_diagnoses(master_df, diagnoses)
+
+    if diagnoses:
+        sub_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
+    else:
+        master_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
+
+    print(f"Data have been processed and output to {output_p}")
