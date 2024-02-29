@@ -92,10 +92,11 @@ if __name__ == "__main__":
     output_p = Path(root_p / "wrangling-phenotype/outputs")
 
     master_df = create_master(rest_qc_p, datasets, which_qc_col)
-    sub_df = filter_diagnoses(master_df, diagnoses)
 
     if diagnoses:
+        sub_df = filter_diagnoses(master_df, diagnoses)
         sub_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
+
     else:
         master_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
 
