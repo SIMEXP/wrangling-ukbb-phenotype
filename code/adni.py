@@ -1,6 +1,6 @@
 """Load ADNI data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-02-23
+Author: Natasha Clarke; last edit 2024-03-01
 
 All input stored in `data/adni` folder. The content of `data` is not
 included in the repository.
