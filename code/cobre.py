@@ -1,6 +1,6 @@
 """Load COBRE data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-02-27
+Author: Natasha Clarke; last edit 2024-03-04
 
 All input stored in `data/cobre` folder. The content of `data` is not
 included in the repository.
