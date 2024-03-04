@@ -1,6 +1,6 @@
 """Load SRPBS (Open) data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-02-27
+Author: Natasha Clarke; last edit 2024-03-04
 
 All input stored in `data/srpbs` folder. The content of `data` is not
 included in the repository.
@@ -64,10 +64,20 @@ metadata = {
             "OTHER": "other",
         },
     },
+    "handedness": {
+        "original_field_name": "hand",
+        "description": "Dominant hand of the participant",
+        "levels": {
+            "right": "right",
+            "left": "left",
+            "both": "both",
+            "unknown": "unknown",
+        },
+    },
 }
 
 
-def process_data(csv_file_p, output_p, metadata):
+def process_data(csv_file_p, sup_file_p, output_p, metadata):
     # Load the CSV
     df = pd.read_csv(csv_file_p, sep="\t")
 
@@ -91,9 +101,11 @@ def process_data(csv_file_p, output_p, metadata):
             99: "OTHER",
         }
     )
+    df["handedness"] = df["hand"].map({1: "right", 2: "left", 0: "both"})
+    df["handedness"] = df["handedness"].fillna("unknown")
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
+    df = df[["participant_id", "age", "sex", "site", "diagnosis", "handedness"]]
 
     # Output tsv file
     df.to_csv(output_p / "srpbs_pheno.tsv", sep="\t", index=False)
