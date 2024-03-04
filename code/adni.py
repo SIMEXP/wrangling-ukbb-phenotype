@@ -48,6 +48,10 @@ metadata = {
             "Patient": "unknown",
         },
     },
+    "educat": {
+        "original_field_name": "PTEDUCAT",
+        "description": "Years in education",
+    },
 }
 
 
@@ -128,6 +132,17 @@ def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
     # Match diagnoses
     df = process_diagnosis_data(scan_df, diagnosis_df)
 
+    # Get the education data
+    diagnosis_df = diagnosis_df.drop_duplicates(subset=["PTID"], keep="first")
+    df = pd.merge(
+        df,
+        diagnosis_df[["PTID", "PTEDUCAT"]],
+        left_on="Subject ID",
+        right_on="PTID",
+        how="left",
+    )
+    df.rename(columns={"PTEDUCAT": "educat"}, inplace=True)
+
     # Process the data
     df["age"] = df["Age"].astype(float)
     df["sex"] = df["Sex"].map({"F": "female", "M": "male"})
@@ -137,7 +152,7 @@ def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
     df["participant_id"] = df["Subject ID"].str.replace("_", "", regex=False)
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
+    df = df[["participant_id", "age", "sex", "site", "diagnosis", "educat"]]
 
     # Sort df
     df = df.sort_values(by=["participant_id", "age"])
