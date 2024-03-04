@@ -1,6 +1,6 @@
 """Load COBRE data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-02-13
+Author: Natasha Clarke; last edit 2024-02-27
 
 All input stored in `data/cobre` folder. The content of `data` is not
 included in the repository.
@@ -39,6 +39,11 @@ metadata = {
         "description": "Diagnosis of the participant",
         "levels": {"CON": "control", "SCHZ": "schizophrenia"},
     },
+    "handedness": {
+        "original_field_name": "Handedness",
+        "description": "Dominant hand of the participant",
+        "levels": {"right": "right", "left": "left", "both": "both"},
+    },
 }
 
 
@@ -56,9 +61,12 @@ def process_data(csv_file_p, output_p, metadata):
     df["sex"] = df["Gender"].map({"Female": "female", "Male": "male"})
     df["site"] = "cobre"  # There is only one site, and no name provided
     df["diagnosis"] = df["Subject Type"].map({"Control": "CON", "Patient": "SCHZ"})
+    df["handedness"] = df["Handedness"].map(
+        {"Right": "right", "Left": "left", "Both": "both"}
+    )
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
+    df = df[["participant_id", "age", "sex", "site", "diagnosis", "handedness"]]
 
     # Output tsv file
     df.to_csv(output_p / "cobre_pheno.tsv", sep="\t", index=False)
