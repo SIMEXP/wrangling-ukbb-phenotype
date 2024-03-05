@@ -1,6 +1,6 @@
 """Load CIMA-Q data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-02-22
+Author: Natasha Clarke; last edit 2024-03-05
 
 All input stored in `data/cimaq` folder. The content of `data` is not
 included in the repository.
@@ -52,6 +52,15 @@ metadata = {
             "SCD": "subjective cognitive decline",
         },
     },
+    "handedness": {
+        "original_field_name": "55398_lateralite",
+        "description": "Dominant hand of the participant",
+        "levels": {"right": "right", "left": "left", "both": "both"},
+    },
+    "education": {
+        "original_field_name": "84756_nombre_annee_education",
+        "description": "Years in education",
+    },
 }
 
 
@@ -86,12 +95,22 @@ def find_closest_diagnosis(scan_row, diagnosis_df):
         return None, None, None
 
 
-def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
-    # Load the CSV
+def process_data(root_p, output_p, metadata):
+    # Paths to different data files
+    scan_file_p = root_p / "sommaire_des_scans.tsv"
+    diagnosis_file_p = root_p / "22501_diagnostic_clinique.tsv"
+    socio_file_p = (
+        root_p / "55398_informations_socio_demographiques_participant_initial.tsv"
+    )
+    edu_file_p = root_p / "84756_variables_reserve_cognitive_bartres_initial.tsv"
+
+    # Load the CSVs
     df = pd.read_csv(scan_file_p, sep="\t", parse_dates=["date"])
     diagnosis_df = pd.read_csv(
         diagnosis_file_p, sep="\t", parse_dates=["date_de_l_évaluation"]
     )
+    socio_df = pd.read_csv(socio_file_p, sep="\t")
+    edu_df = pd.read_csv(edu_file_p, sep="\t", encoding="ISO-8859-1")
 
     # Select only resting state data
     df = df[df["nii_protocole"] == "task-rest"]  # Run again for task-memory
@@ -102,6 +121,24 @@ def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
     )
     df[["diagnosis", "matched_evaluation_date", "date_diff", "sex"]] = (
         result  # Returning these for now because at a later date we may want to drop e.g participants with diagnoses outside a certain window
+    )
+
+    # Match with df for handedness
+    df = pd.merge(
+        df,
+        socio_df[["PSCID", "55398_lateralite"]],
+        left_on="pscid",
+        right_on="PSCID",
+        how="left",
+    )
+
+    # Match with df for education
+    df = pd.merge(
+        df,
+        edu_df[["PSCID", "84756_nombre_annee_education"]],
+        left_on="pscid",
+        right_on="PSCID",
+        how="left",
     )
 
     # Process the data
@@ -119,9 +156,17 @@ def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
             "troubles_subjectifs_de_cognition": "SCD",
         }
     )
+    df["handedness"] = df["55398_lateralite"].map(
+        {"droitier": "right", "gaucher": "left", "ambidextre": "both"}
+    )
+    df["education"] = pd.to_numeric(
+        df["84756_nombre_annee_education"], errors="coerce"
+    )  # This will replace the "donnée_non_disponible" entries with NaN
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
+    df = df[
+        ["participant_id", "age", "sex", "site", "diagnosis", "handedness", "education"]
+    ]
 
     # Output tsv file
     df.to_csv(output_p / "cimaq_pheno.tsv", sep="\t", index=False)
@@ -135,14 +180,11 @@ def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process CIMA-Q phenotype data and output to to TSV and JSON"
+        description="Process CIMA-Q phenotype data and output to TSV and JSON"
     )
-    parser.add_argument("scanfile", type=Path, help="Path to sommaire_des_scans.tsv")
-    parser.add_argument(
-        "diagfile", type=Path, help="Path to 22501_diagnostic_clinique.tsv"
-    )
+    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
     parser.add_argument("output", type=Path, help="Path to the output directory")
 
     args = parser.parse_args()
 
-    process_data(args.scanfile, args.diagfile, args.output, metadata)
+    process_data(args.rootpath, args.output, metadata)
