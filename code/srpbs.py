@@ -71,13 +71,12 @@ metadata = {
             "right": "right",
             "left": "left",
             "both": "both",
-            "unknown": "unknown",
         },
     },
 }
 
 
-def process_data(csv_file_p, sup_file_p, output_p, metadata):
+def process_data(csv_file_p, output_p, metadata):
     # Load the CSV
     df = pd.read_csv(csv_file_p, sep="\t")
 
@@ -102,7 +101,6 @@ def process_data(csv_file_p, sup_file_p, output_p, metadata):
         }
     )
     df["handedness"] = df["hand"].map({1: "right", 2: "left", 0: "both"})
-    df["handedness"] = df["handedness"].fillna("unknown")
 
     # Select columns
     df = df[["participant_id", "age", "sex", "site", "diagnosis", "handedness"]]
