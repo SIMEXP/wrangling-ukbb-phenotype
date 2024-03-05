@@ -1,6 +1,6 @@
 """Load ADNI data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-04
+Author: Natasha Clarke; last edit 2024-03-05
 
 All input stored in `data/adni` folder. The content of `data` is not
 included in the repository.
@@ -48,7 +48,7 @@ metadata = {
             "Patient": "unknown",
         },
     },
-    "educat": {
+    "education": {
         "original_field_name": "PTEDUCAT",
         "description": "Years in education",
     },
@@ -122,7 +122,11 @@ def process_diagnosis_data(scan_df, diagnosis_df):
     return scan_df
 
 
-def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
+def process_data(root_p, output_p, metadata):
+    # Paths to different data files
+    scan_file_p = root_p / "adni_spreadsheet.csv"
+    diagnosis_file_p = root_p / "ADNIMERGE_22Aug2023.csv"
+
     # Load the CSVs
     scan_df = pd.read_csv(scan_file_p, index_col=0, parse_dates=["Study Date"])
     diagnosis_df = pd.read_csv(
@@ -141,7 +145,6 @@ def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
         right_on="PTID",
         how="left",
     )
-    df.rename(columns={"PTEDUCAT": "educat"}, inplace=True)
 
     # Process the data
     df["age"] = df["Age"].astype(float)
@@ -150,9 +153,10 @@ def process_data(scan_file_p, diagnosis_file_p, output_p, metadata):
         df["Subject ID"].str.split("_").str[0].str.lstrip("0")
     )  # Extract site variable from ID and remove leading zeros
     df["participant_id"] = df["Subject ID"].str.replace("_", "", regex=False)
+    df["education"] = df["PTEDUCAT"].astype(float)
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis", "educat"]]
+    df = df[["participant_id", "age", "sex", "site", "diagnosis", "education"]]
 
     # Sort df
     df = df.sort_values(by=["participant_id", "age"])
@@ -169,10 +173,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process ADNI phenotype data and output to to TSV and JSON"
     )
-    parser.add_argument("scanfile", type=Path, help="Path to adni_spreadsheet.csv")
-    parser.add_argument("diagfile", type=Path, help="Path to ADNIMERGE_22Aug2023.csv")
+    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
     parser.add_argument("output", type=Path, help="Path to the output directory")
 
     args = parser.parse_args()
 
-    process_data(args.scanfile, args.diagfile, args.output, metadata)
+    process_data(args.rootpath, args.output, metadata)
