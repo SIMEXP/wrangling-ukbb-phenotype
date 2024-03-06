@@ -70,15 +70,18 @@ metadata = {
         "levels": {
             "right": "right",
             "left": "left",
-            "both": "both",
+            "ambidextrous": "ambidextrous",
         },
     },
 }
 
 
-def process_data(csv_file_p, output_p, metadata):
+def process_data(root_p, output_p, metadata):
+    # Path to data
+    data_p = root_p / "participants.tsv"
+
     # Load the CSV
-    df = pd.read_csv(csv_file_p, sep="\t")
+    df = pd.read_csv(data_p, sep="\t")
 
     # Remove sub- from participant id
     df["participant_id"] = df["participant_id"].str.replace("sub-", "", regex=False)
@@ -100,7 +103,7 @@ def process_data(csv_file_p, output_p, metadata):
             99: "OTHER",
         }
     )
-    df["handedness"] = df["hand"].map({1: "right", 2: "left", 0: "both"})
+    df["handedness"] = df["hand"].map({1: "right", 2: "left", 0: "ambidextrous"})
 
     # Select columns
     df = df[["participant_id", "age", "sex", "site", "diagnosis", "handedness"]]
@@ -119,9 +122,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process SRPBS (Open) phenotype data and output to TSV and JSON"
     )
-    parser.add_argument("datafile", type=Path, help="Path to the input TSV data file")
+    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
     parser.add_argument("output", type=Path, help="Path to the output directory")
 
     args = parser.parse_args()
 
-    process_data(args.datafile, args.output, metadata)
+    process_data(args.rootpath, args.output, metadata)
