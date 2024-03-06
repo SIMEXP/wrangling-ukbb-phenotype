@@ -48,9 +48,12 @@ metadata = {
 }
 
 
-def process_data(csv_file_p, output_p, metadata):
+def process_data(root_p, output_p, metadata):
+    # Path to data
+    data_p = root_p / "participants.csv"
+
     # Load the CSV
-    df = pd.read_csv(csv_file_p)
+    df = pd.read_csv(data_p)
 
     # Remove sub- from participant id
     df["participant_id"] = df["participant_id"].str.replace("sub-", "", regex=False)
@@ -80,9 +83,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process ds000030 phenotype data and output to TSV and JSON"
     )
-    parser.add_argument("datafile", type=Path, help="Path to the input CSV data file")
+    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
     parser.add_argument("output", type=Path, help="Path to the output directory")
 
     args = parser.parse_args()
 
-    process_data(args.datafile, args.output, metadata)
+    process_data(args.rootpath, args.output, metadata)
