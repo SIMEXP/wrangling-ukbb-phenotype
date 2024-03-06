@@ -55,7 +55,7 @@ metadata = {
     "handedness": {
         "original_field_name": "55398_lateralite",
         "description": "Dominant hand of the participant",
-        "levels": {"right": "right", "left": "left", "both": "both"},
+        "levels": {"right": "right", "left": "left", "ambidextrous": "ambidextrous"},
     },
     "education": {
         "original_field_name": "84756_nombre_annee_education",
@@ -157,7 +157,7 @@ def process_data(root_p, output_p, metadata):
         }
     )
     df["handedness"] = df["55398_lateralite"].map(
-        {"droitier": "right", "gaucher": "left", "ambidextre": "both"}
+        {"droitier": "right", "gaucher": "left", "ambidextre": "ambidextrous"}
     )
     df["education"] = pd.to_numeric(
         df["84756_nombre_annee_education"], errors="coerce"
