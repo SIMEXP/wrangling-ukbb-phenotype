@@ -42,14 +42,17 @@ metadata = {
     "handedness": {
         "original_field_name": "Handedness",
         "description": "Dominant hand of the participant",
-        "levels": {"right": "right", "left": "left", "both": "both"},
+        "levels": {"right": "right", "left": "left", "ambidextrous": "ambidextrous"},
     },
 }
 
 
-def process_data(csv_file_p, output_p, metadata):
+def process_data(root_p, output_p, metadata):
+    # Path to data
+    data_p = root_p / "COBRE_phenotypic_data.csv"
+
     # Load the CSV and rename first column
-    df = pd.read_csv(csv_file_p, dtype=str)
+    df = pd.read_csv(data_p, dtype=str)
     df.rename(columns={df.columns[0]: "participant_id"}, inplace=True)
 
     # Filter out any subjects who disenrolled
@@ -62,7 +65,7 @@ def process_data(csv_file_p, output_p, metadata):
     df["site"] = "cobre"  # There is only one site, and no name provided
     df["diagnosis"] = df["Subject Type"].map({"Control": "CON", "Patient": "SCHZ"})
     df["handedness"] = df["Handedness"].map(
-        {"Right": "right", "Left": "left", "Both": "both"}
+        {"Right": "right", "Left": "left", "Both": "ambidextrous"}
     )
 
     # Select columns
@@ -82,9 +85,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process COBRE phenotype data and output to to TSV and JSON"
     )
-    parser.add_argument("datafile", type=Path, help="Path to the input CSV data file")
+    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
     parser.add_argument("output", type=Path, help="Path to the output directory")
 
     args = parser.parse_args()
 
-    process_data(args.datafile, args.output, metadata)
+    process_data(args.rootpath, args.output, metadata)
