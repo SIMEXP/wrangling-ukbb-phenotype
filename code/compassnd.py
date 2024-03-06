@@ -33,11 +33,12 @@ metadata = {
     "site": {
         "original_field_name": "Initial_MRI mri_parameter_form,006_site",
         "description": "Site of imaging data collection",
+        "levels": {"unable to find the corresponding site names currently"},
     },
     "diagnosis": {
         "original_field_name": "",
         "description": "Diagnosis of the participant",
-        "levels": {"CON": "control", "SCHZ": "schizophrenia"},
+        "levels": {},
     },
     "handedness": {
         "original_field_name": "Initial_Assessment_Screening Screening_Birth_Sex_Handedness,015_hand_preference",
