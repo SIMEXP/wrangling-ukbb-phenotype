@@ -160,9 +160,12 @@ def process_diagnosis_data(df):
     return df
 
 
-def process_data(csv_file_p, output_p, metadata):
+def process_data(root_p, output_p, metadata):
+    # Path to data
+    data_p = root_p / "clarken_8_28_2023_13_54_33.csv"
+
     # Load the CSV
-    df = pd.read_csv(csv_file_p)
+    df = pd.read_csv(data_p)
 
     # Drop rows that don't pertain to participants
     df = df.loc[~df["MR ID"].str.contains("OASIS3_data_files|OASIS_cohort_files")]
@@ -198,9 +201,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process OASIS3 phenotype data and output to TSV and JSON"
     )
-    parser.add_argument("datafile", type=Path, help="Path to the input TSV data file")
+    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
     parser.add_argument("output", type=Path, help="Path to the output directory")
 
     args = parser.parse_args()
 
-    process_data(args.datafile, args.output, metadata)
+    process_data(args.rootpath, args.output, metadata)
