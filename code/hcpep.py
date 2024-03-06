@@ -47,9 +47,12 @@ metadata = {
 }
 
 
-def process_data(txt_file_p, output_p, metadata):
+def process_data(root_p, output_p, metadata):
+    # Path to data
+    data_p = root_p / "ndar_subject01.txt"
+
     # Load the data
-    df = pd.read_csv(txt_file_p, delimiter="\t", header=[0, 1])
+    df = pd.read_csv(data_p, delimiter="\t", header=[0, 1])
     df.columns = df.columns.droplevel(1)  # Drop the second header
 
     # Process the data
@@ -85,9 +88,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process HCP-EP phenotype data and output to TSV and JSON"
     )
-    parser.add_argument("datafile", type=Path, help="Path to the input TXT data file")
+    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
     parser.add_argument("output", type=Path, help="Path to the output directory")
 
     args = parser.parse_args()
 
-    process_data(args.datafile, args.output, metadata)
+    process_data(args.rootpath, args.output, metadata)
