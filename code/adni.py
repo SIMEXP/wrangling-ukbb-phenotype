@@ -116,7 +116,7 @@ def process_diagnosis_data(scan_df, diagnosis_df):
 
     # Map values
     scan_df["diagnosis"] = scan_df["diagnosis"].replace(
-        {"CN": "CON", "EMCI": "MCI", "LMCI": "MCI", "Dementia": "ADD"}
+        {"AD": "ADD", "CN": "CON", "EMCI": "MCI", "LMCI": "MCI", "Dementia": "ADD"}
     )
 
     return scan_df
@@ -167,6 +167,8 @@ def process_data(root_p, output_p, metadata):
     # Output metadata to json
     with open(output_p / "adni_pheno.json", "w") as f:
         json.dump(metadata, f, indent=2)
+
+    print(f"Data and metadata have been processed and output to {output_p}")
 
 
 if __name__ == "__main__":
