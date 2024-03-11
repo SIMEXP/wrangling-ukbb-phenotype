@@ -40,9 +40,9 @@ metadata = {
         "levels": {
             "ADD": "Alzheimer's disease dementia (probable)",
             "ADD(POSS)": "Alzheimer's disease dementia (possible)",
-            "ALCDEM": "",
+            "ALCDEM": "alcohol-related dementia",
             "ANX": "anxiety disorder",
-            "COGOTH": "",
+            "COGOTH": "other cognitive/neurologic condition",
             "CON": "control",
             "CORT": "corticobasal degeneration",
             "DEMUN": "dementia of undetermined etiology",
