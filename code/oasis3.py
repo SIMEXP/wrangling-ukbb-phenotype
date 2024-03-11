@@ -1,6 +1,6 @@
 """Load OASIS3 data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-08
+Author: Natasha Clarke; last edit 2024-03-11
 
 All input stored in `data/oasis3` folder. The content of `data` is not
 included in the repository.
@@ -40,11 +40,33 @@ metadata = {
         "levels": {
             "ADD": "Alzheimer's disease dementia (probable)",
             "ADD(POSS)": "Alzheimer's disease dementia (possible)",
+            "ALCDEM": "",
             "ANX": "anxiety disorder",
+            "COGOTH": "",
             "CON": "control",
             "CORT": "corticobasal degeneration",
-            "ADD(POSS)": "Alzheimer's disease dementia (possible)",
-            "CON": "control",
+            "DEMUN": "dementia of undetermined etiology",
+            "DEP": "depression",
+            "DLB": "dementia with lewy bodies",
+            "DOWNS": "down's syndrome",
+            "DYSILL": "cognitive dysfunction from medical illnesses",
+            "EPIL": "epilepsy",
+            "FTLD": "fronto-temporal lobe dementia",
+            "HUNT": "Huntingtons disease",
+            "HYCEPH": "hydrocephalus",
+            "MCI": "mild cognitive impairment",
+            "MEDS": "cognitive dysfunction from medications",
+            "NEOP": "central nervous system neoplasm",
+            "OTHPSY": "other major psychiatric illness",
+            "PARK": "parkinsons disease",
+            "PPA": "primary progressive aphasia",
+            "PRION": "prion disease",
+            "PSP": "progressive supranuclear palsy",
+            "STROKE": "stroke",
+            "TBI": "traumatic brain injury",
+            "VASC": "vascular dementia (probable)",
+            "VASC(POSS)": "vascular dementia (possible)",
+            "VBI": "Vascular brain injury",
         },
     },
     "handedness": {
@@ -95,7 +117,7 @@ def assign_diagnoses(df):
     df.loc[df[mci_columns].sum(axis=1) > 0, "diagnosis"] = "MCI"
     df.loc[(df["PROBADIF"] == 1) | (df["alzdisif"] == 1), "diagnosis"] = "ADD"
     df.loc[(df["POSSADIF"] == 1), "diagnosis"] = "ADD(POSS)"
-    df.loc[(df["DLBIF"] == 1) | (df["lbdif"] == 1), "diagnosis"] = "LBD"
+    df.loc[(df["DLBIF"] == 1) | (df["lbdif"] == 1), "diagnosis"] = "DLB"
     df.loc[(df["VASCIF"] == 1), "diagnosis"] = "VASC"
     df.loc[(df["VASCPSIF"] == 1), "diagnosis"] = "VASC(POSS)"
     df.loc[(df["ALCDEMIF"] == 1), "diagnosis"] = "ALCDEM"
