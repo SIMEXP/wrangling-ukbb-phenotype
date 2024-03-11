@@ -35,7 +35,7 @@ metadata = {
         "description": "Site of imaging data collection",
     },
     "diagnosis": {
-        "original_field_name": "Diagnoses use NACC codes, taken from the documents uds2-ivp-ded.pdf and uds3-ivp-ded.pdf.",
+        "original_field_name": "Diagnoses use NACC codes, taken from the documents uds2-ivp-ded.pdf and uds3-ivp-ded.pdf. These are the PRIMARY diagnosis.",
         "description": "Diagnosis of the participant",
         "levels": {
             "ADD": "Alzheimer's disease dementia (probable)",
