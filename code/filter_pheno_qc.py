@@ -220,10 +220,12 @@ def summarise_passed_qc(merged_df, dataset, which_qc_col):
                 "qc_column": which_qc_col,
                 "total_sessions": total_sessions,
                 "sessions_passed_qc (any 1 run)": passed_sessions,
-                "percentage_sessiond_passed_qc": percentage_passed,
+                "percentage_sessiond_passed_qc": round(percentage_passed),
                 "total_subjects": total_unique_subjects,
                 "subjects_passed_qc (any 1 session)": unique_passed_subjects,
-                "percentage_subjects_passed_qc": percentage_unique_subjects_passed,
+                "percentage_subjects_passed_qc": round(
+                    percentage_unique_subjects_passed
+                ),
             }
         ]
     )
