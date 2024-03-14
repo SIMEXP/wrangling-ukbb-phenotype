@@ -145,6 +145,9 @@ def summarise_sessions(dataset_df, which_qc_col):
     else:
         percentage_passed = 0
 
+    # Replace the dummy session variable
+    unique_sessions_df["ses"] = unique_sessions_df["ses"].replace("ses1", "")
+
     return unique_sessions_df, total_sessions, passed_sessions, percentage_passed
 
 
@@ -237,7 +240,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Filter phenotype data according to QC result"
     )
-    parser.add_argument("--root", type=str, help="Root path for data")
+    parser.add_argument("--root", type=Path, help="Root path for data")
     parser.add_argument(
         "--datasets", nargs="+", type=str, help="List of datasets to process"
     )
@@ -255,13 +258,13 @@ if __name__ == "__main__":
     which_qc_col = args.which_qc_col or "pass_func_qc"
     diagnoses = args.diagnoses if args.diagnoses else None
 
-    root_p = Path(args.root)
     pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
-    rest_qc_p = Path(root_p / "qc_output/rest_df.tsv")
-    output_p = Path(root_p / "wrangling-phenotype/outputs")
+    rest_qc_p = args.root / "qc_output/rest_df.tsv"
+    output_p = args.root / "wrangling-phenotype/outputs"
 
-    # Load QC df once
+    # Load QC and frames data
     qc_df = pd.read_csv(rest_qc_p, sep="\t")
+    frames_df = pd.read_csv(rest_qc_p, sep="\t")
 
     # Create df of pheno and qc results
     master_df = create_master_df(qc_df, datasets, which_qc_col)
@@ -282,6 +285,8 @@ if __name__ == "__main__":
 
     else:
         filtered_df = master_df[master_df[which_qc_col] == True]
+
+    # Match QC df with number of frames remaining (separate .tsv)
 
     # Save output
     qc_summary_df.to_csv(output_p / "qc_summary.tsv", sep="\t", index=False)
