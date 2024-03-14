@@ -61,7 +61,7 @@ def merge_pheno_qc(qc_df, pheno_df, which_qc_col, dataset):
     return merged_df
 
 
-def create_master_df(qc_df, datasets, which_qc_col):
+def create_master_df(root_p, qc_df, datasets, which_qc_col):
     """
     Creates a master DataFrame by merging QC data with phenotype data across multiple datasets.
 
@@ -80,7 +80,9 @@ def create_master_df(qc_df, datasets, which_qc_col):
     """
     master_df = pd.DataFrame()
     for dataset in datasets:
-        pheno_p = Path(root_p / pheno_p_template.format(dataset=dataset))
+        # Ensure the placeholder for `dataset` is correctly placed within the string
+        pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
+        pheno_p = args.root_p / pheno_p_template.format(dataset=dataset)
         pheno_df = pd.read_csv(pheno_p, sep="\t", dtype={"participant_id": str})
         df = merge_pheno_qc(qc_df, pheno_df, which_qc_col, dataset)
         master_df = pd.concat([master_df, df], ignore_index=True)
@@ -240,7 +242,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Filter phenotype data according to QC result"
     )
-    parser.add_argument("--root", type=Path, help="Root path for data")
+    parser.add_argument("--root_p", type=Path, help="Root path for data")
     parser.add_argument(
         "--datasets", nargs="+", type=str, help="List of datasets to process"
     )
@@ -258,16 +260,16 @@ if __name__ == "__main__":
     which_qc_col = args.which_qc_col or "pass_func_qc"
     diagnoses = args.diagnoses if args.diagnoses else None
 
-    pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
-    rest_qc_p = args.root / "qc_output/rest_df.tsv"
-    output_p = args.root / "wrangling-phenotype/outputs"
+    rest_qc_p = args.root_p / "qc_output/rest_df.tsv"
+    frames_p = args.root_p / "wrangling-phenotype/outputs/cobre_frames.tsv"
+    output_p = args.root_p / "wrangling-phenotype/outputs"
 
     # Load QC and frames data
     qc_df = pd.read_csv(rest_qc_p, sep="\t")
-    frames_df = pd.read_csv(rest_qc_p, sep="\t")
+    frames_df = pd.read_csv(frames_p, sep="\t", dtype={"participant_id": str})
 
     # Create df of pheno and qc results
-    master_df = create_master_df(qc_df, datasets, which_qc_col)
+    master_df = create_master_df(args.root_p, qc_df, datasets, which_qc_col)
 
     # Summarise QC results
     qc_summary_df_list = []
@@ -287,9 +289,13 @@ if __name__ == "__main__":
         filtered_df = master_df[master_df[which_qc_col] == True]
 
     # Match QC df with number of frames remaining (separate .tsv)
+    frames_df = frames_df.loc[frames_df["task"] == "rest"]
+    matched_df = filtered_df.merge(
+        frames_df, on=["participant_id", "ses", "run", "dataset"], how="inner"
+    )
 
     # Save output
     qc_summary_df.to_csv(output_p / "qc_summary.tsv", sep="\t", index=False)
-    filtered_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
+    matched_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
 
     print(f"Data have been processed and output to {output_p}")
