@@ -35,6 +35,8 @@ if __name__ == "__main__":
         help="Analysis level: 'group' or 'participant'",
     )
 
+    parser.add_argument("dataset", type=str, help="Name of the dataset")
+
     args = parser.parse_args()
 
     data = []
@@ -64,5 +66,9 @@ if __name__ == "__main__":
     )
     df[["participant_id", "ses", "task", "run"]] = df["file"].str.extract(pattern)
 
+    # Drop the file column and add dataset as a column
+    df.drop(columns=["file"], inplace=True)
+    df["dataset"] = args.dataset
+
     # Save output
-    df.to_csv(args.output_p / "cobre_frames.tsv", sep="\t", index=False)
+    df.to_csv(args.output_p / f"{args.dataset}_frames.tsv", sep="\t", index=False)
