@@ -62,7 +62,7 @@ if __name__ == "__main__":
     pattern = (
         r"sub-([^\s/_]+)(?:_ses-([a-zA-Z0-9]+))_task-([a-zA-Z0-9]+)(?:_run-(\d+))?"
     )
-    df[["participant_id", "session", "task", "run"]] = df["file"].str.extract(pattern)
+    df[["participant_id", "ses", "task", "run"]] = df["file"].str.extract(pattern)
 
     # Save output
     df.to_csv(args.output_p / "cobre_frames.tsv", sep="\t", index=False)
