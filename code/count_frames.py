@@ -10,7 +10,7 @@ def count_frames(hdf5_object, target_suffix="atlas-MIST_desc-64_timeseries", pat
     for name in hdf5_object:
         item_path = f"{path}/{name}" if path else name
         if isinstance(hdf5_object[name], h5py.Dataset) and name.endswith(target_suffix):
-            # Collect dataset name and the first dimension of its shape.
+            # Collect dataset name and the first dimension of its shape
             data.append({"file": name, "n_frames": hdf5_object[name].shape[0]})
         elif isinstance(hdf5_object[name], h5py.Group):
             # Recursive call to navigate through groups and collect data
@@ -25,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "input_p",
         type=Path,
-        help="Path to either a directory containing subject directories [participant] or .h5 file containing connectomes [group]",
+        help="Path to directory containing subject directories [participant] or .h5 file of connectomes [group]",
     )
     parser.add_argument("output_p", type=Path, help="Output path")
 
@@ -38,7 +38,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     data = []
-
     if args.level == "participant":
         for sub_directory in args.input_p.iterdir():
             if sub_directory.is_dir() and sub_directory.name != "working_directory":
@@ -49,11 +48,11 @@ if __name__ == "__main__":
                 if hdf5_file_p.exists():
                     with h5py.File(hdf5_file_p, "r") as file:
                         data.extend(count_frames(file))
-                        print(data)
                 else:
                     print(f"File {hdf5_file_p} does not exist.")
     elif args.level == "group":
-        with h5py.File(args.input_p, "r") as file:
+        hdf5_file_p = args.input_p / "atlas-MIST_desc-scrubbing.5+gsr.h5"
+        with h5py.File(hdf5_file_p, "r") as file:
             data = count_frames(file)
 
     # Convert the list of dictionaries into a DataFrame
@@ -66,4 +65,4 @@ if __name__ == "__main__":
     df[["participant_id", "session", "task", "run"]] = df["file"].str.extract(pattern)
 
     # Save output
-    df.to_csv(args.output_p / "hcpep_frames.tsv", sep="\t", index=False)
+    df.to_csv(args.output_p / "cobre_frames.tsv", sep="\t", index=False)
