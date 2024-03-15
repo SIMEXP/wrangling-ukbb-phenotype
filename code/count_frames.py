@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     # Extract file details. Session and run are optional
     pattern = (
-        r"sub-([^\s/_]+)(?:_ses-([a-zA-Z0-9]+))_task-([a-zA-Z0-9]+)(?:_run-(\d+))?"
+        r"sub-([^\s/_]+)_task-([a-zA-Z0-9]+)(?:_ses-([a-zA-Z0-9]+))?(?:_run-(\d+))?"
     )
     df[["participant_id", "ses", "task", "run"]] = df["file"].str.extract(pattern)
 
