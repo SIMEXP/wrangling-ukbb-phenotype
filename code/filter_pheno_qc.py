@@ -80,7 +80,6 @@ def create_master_df(root_p, qc_df, datasets, which_qc_col):
     """
     master_df = pd.DataFrame()
     for dataset in datasets:
-        # Ensure the placeholder for `dataset` is correctly placed within the string
         pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
         pheno_p = args.root_p / pheno_p_template.format(dataset=dataset)
         pheno_df = pd.read_csv(pheno_p, sep="\t", dtype={"participant_id": str})
@@ -148,6 +147,7 @@ def summarise_sessions(dataset_df, which_qc_col):
         percentage_passed = 0
 
     # Replace the dummy session variable
+    unique_sessions_df = unique_sessions_df.copy()
     unique_sessions_df["ses"] = unique_sessions_df["ses"].replace("ses1", "")
 
     return unique_sessions_df, total_sessions, passed_sessions, percentage_passed
@@ -225,7 +225,7 @@ def summarise_passed_qc(merged_df, dataset, which_qc_col):
                 "qc_column": which_qc_col,
                 "total_sessions": total_sessions,
                 "sessions_passed_qc (any 1 run)": passed_sessions,
-                "percentage_sessiond_passed_qc": round(percentage_passed),
+                "percentage_sessions_passed_qc": round(percentage_passed),
                 "total_subjects": total_unique_subjects,
                 "subjects_passed_qc (any 1 session)": unique_passed_subjects,
                 "percentage_subjects_passed_qc": round(
@@ -261,7 +261,7 @@ if __name__ == "__main__":
     diagnoses = args.diagnoses if args.diagnoses else None
 
     rest_qc_p = args.root_p / "qc_output/rest_df.tsv"
-    frames_p = args.root_p / "wrangling-phenotype/outputs/cobre_frames.tsv"
+    frames_p = args.root_p / "wrangling-phenotype/data/frames/total_frames_master.tsv"
     output_p = args.root_p / "wrangling-phenotype/outputs"
 
     # Load QC and frames data
@@ -282,14 +282,12 @@ if __name__ == "__main__":
     # Filter df for scans that passed QC only, optionally for specific diagnoses
     if diagnoses:
         sub_df = filter_diagnoses(master_df, diagnoses)
-        filtered_df = sub_df[sub_df[which_qc_col] == True]
-        filtered_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
-
+        filtered_df = sub_df[sub_df[which_qc_col] == True].copy()
     else:
-        filtered_df = master_df[master_df[which_qc_col] == True]
+        filtered_df = master_df[master_df[which_qc_col] == True].copy()
 
-    # Match QC df with number of frames remaining (separate .tsv)
-    frames_df = frames_df.loc[frames_df["task"] == "rest"]
+    # Match QC df with frames df (total frames or number of frames remaining)
+    frames_df = frames_df.loc[frames_df["task"] == "rest"].copy()
     matched_df = filtered_df.merge(
         frames_df, on=["participant_id", "ses", "run", "dataset"], how="inner"
     )
