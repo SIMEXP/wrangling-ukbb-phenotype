@@ -265,7 +265,9 @@ if __name__ == "__main__":
     output_p = args.root_p / "wrangling-phenotype/outputs"
 
     # Load QC and frames data
-    qc_df = pd.read_csv(rest_qc_p, sep="\t")
+    qc_df = pd.read_csv(
+        rest_qc_p, sep="\t", low_memory=False
+    )  # dtype={"participant_id": str, "ses": str}
     frames_df = pd.read_csv(frames_p, sep="\t", dtype={"participant_id": str})
 
     # Create df of pheno and qc results
@@ -295,5 +297,6 @@ if __name__ == "__main__":
     # Save output
     qc_summary_df.to_csv(output_p / "qc_summary.tsv", sep="\t", index=False)
     matched_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
+    # filtered_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
 
     print(f"Data have been processed and output to {output_p}")
