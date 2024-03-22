@@ -20,9 +20,9 @@ from pathlib import Path
 
 # Define metadata
 metadata = {
-    "participant_id": {
-        "original_field_name": "Subject ID in adni_spreadsheet.csv (PTID in ADNIMERGE_22Aug2023.csv)",
-        "description": "Unique identifier for each participant",
+    "original_field_name": {
+        "adni_spreadsheet.csv": "Subject ID",
+        "ADNIMERGE_22Aug2023.csv": "PTID",
     },
     "age": {
         "original_field_name": "Age",
