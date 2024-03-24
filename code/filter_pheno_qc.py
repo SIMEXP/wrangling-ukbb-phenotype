@@ -271,7 +271,15 @@ if __name__ == "__main__":
     frames_df = pd.read_csv(frames_p, sep="\t", dtype={"participant_id": str})
 
     # Create df of pheno and qc results
-    master_df = create_master_df(args.root_p, qc_df, datasets, which_qc_col)
+    # First for cross sectional datasets
+    for dataset in datasets:
+        if dataset in ["abide1", "abide2", "cobre", "hcpep", "srpbs", "ds000030"]:
+            cross_sectional_df = create_master_df(args.root_p, qc_df, datasets, which_qc_col)
+
+        elif:
+            dataset == "adni": # etc, work out how to match these
+
+    master_df = pd.concat(cross_sectional_df, ...)
 
     # Summarise QC results
     qc_summary_df_list = []
@@ -292,6 +300,16 @@ if __name__ == "__main__":
     frames_df = frames_df.loc[frames_df["task"] == "rest"].copy()
     matched_df = filtered_df.merge(
         frames_df, on=["participant_id", "ses", "run", "dataset"], how="inner"
+    )
+
+    # Rework adni subject id's so they match other adni spreadsheets
+    matched_df["participant_id"] = matched_df.apply(
+        lambda row: (
+            row["participant_id"].split("S")[-1]
+            if row["dataset"] == "adni"
+            else row["participant_id"]
+        ),
+        axis=1,
     )
 
     # Save output
