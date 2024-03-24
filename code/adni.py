@@ -154,9 +154,12 @@ def process_data(root_p, output_p, metadata):
     )  # Extract site variable from ID and remove leading zeros
     df["participant_id"] = df["Subject ID"].str.replace("_", "", regex=False)
     df["education"] = df["PTEDUCAT"].astype(float)
+    df["ses"] = df["Study Date"]
+
+    print(df.columns)
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis", "education"]]
+    df = df[["participant_id", "age", "sex", "site", "diagnosis", "education", "ses"]]
 
     # Sort df
     df = df.sort_values(by=["participant_id", "age"])
