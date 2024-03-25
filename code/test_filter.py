@@ -16,226 +16,23 @@ import pandas as pd
 from pathlib import Path
 
 
-def merge_pheno_qc(qc_df, pheno_df, which_qc_col, dataset):
-    """
-    Merges QC data with phenotype data for a specific dataset.
+def merge_adni(qc_df_filtered, pheno_df):
+    qc_df_filtered["ses"] = pd.to_datetime(qc_df_filtered["ses"])
+    qc_df_filtered = qc_df_filtered.sort_values(by="ses")
 
-    Parameters:
-    - qc_df (pd.DataFrame): DataFrame containing QC data, must include 'participant_id' and 'dataset' columns.
-    - pheno_df (pd.DataFrame): DataFrame containing phenotype data, must include 'participant_id'.
-    - which_qc_col (str): Name of the QC column to indicate QC status.
-    - dataset (str): Name of the dataset to filter the merged DataFrame on.
+    pheno_df["ses"] = pd.to_datetime(pheno_df["ses"])
+    pheno_df = pheno_df.sort_values(by="ses")
 
-    Returns:
-    - pd.DataFrame: A DataFrame merged on 'participant_id', filtered by 'dataset',
-      with relevant columns selected, including the specified QC status column.
-    """
-    pheno_df["participant_id"] = pheno_df["participant_id"].astype(str)
-    qc_df["participant_id"] = qc_df["participant_id"].astype(str)
-    qc_df_filtered = qc_df[qc_df["dataset"] == dataset]
-
-    merged_df = qc_df_filtered.merge(pheno_df, on="participant_id", how="left")
-
-    # Handle site columns
-    merged_df.drop(columns=["site_x"], inplace=True)
-    merged_df.rename(columns={"site_y": "site"}, inplace=True)
-
-    # Select relevant columns
-    merged_df = merged_df[
-        [
-            "identifier",
-            "participant_id",
-            "ses",
-            "run",
-            "age",
-            "sex",
-            "site",
-            "proportion_kept",
-            "mean_fd_raw",
-            "diagnosis",
-            "dataset",
-        ]
-        + [which_qc_col]
-    ]
+    merged_df = pd.merge_asof(
+        qc_df_filtered,
+        pheno_df,
+        by="participant_id",  # Match participants
+        on="ses",  # Find the nearest match based on session date
+        direction="nearest",
+        tolerance=pd.Timedelta(days=183),
+    )
 
     return merged_df
-
-
-def create_master_df(root_p, qc_df, datasets, which_qc_col):
-    """
-    Creates a master DataFrame by merging QC data with phenotype data across multiple datasets.
-
-    Parameters:
-    - qc_df (pd.DataFrame): DataFrame containing QC data, including a column for QC status and 'participant_id'.
-    - datasets (list of str): List containing the names of the datasets to process.
-    - which_qc_col (str): Name of the QC column to indicate QC status.
-
-    Returns:
-    - pd.DataFrame: A master DataFrame containing merged QC and phenotype data for all specified datasets.
-                     The DataFrame includes an additional column specified by which_qc_col to indicate the
-                     QC status of each scan.
-
-    Note:
-    - Assumes that there is a phenotypic df available for each dataset.
-    """
-    # master_df = pd.DataFrame()
-    for dataset in datasets:
-        pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
-        pheno_p = args.root_p / pheno_p_template.format(dataset=dataset)
-        pheno_df = pd.read_csv(pheno_p, sep="\t", dtype={"participant_id": str})
-        df = merge_pheno_qc(qc_df, pheno_df, which_qc_col, dataset)
-        master_df = pd.concat([master_df, df], ignore_index=True)
-
-    return master_df
-
-
-def filter_diagnoses(df, diagnoses):
-    """
-    Filters a DataFrame to retain only rows that match specified diagnoses.
-
-    Parameters:
-    - df (pd.DataFrame): DataFrame to be filtered, expected to include a 'diagnosis' column.
-    - diagnoses (list of str): List of diagnoses to filter by. Rows with a 'diagnosis' value
-                               matching any item in this list will be retained.
-
-    Returns:
-    - pd.DataFrame: A filtered DataFrame containing only the rows that match one of the specified diagnoses.
-    """
-    return df[df["diagnosis"].isin(diagnoses)]
-
-
-def summarise_sessions(dataset_df, which_qc_col):
-    """
-    Summarises session pass rates based on the specified QC column. For a given session, it is counted as one pass if any run passed QC.
-
-    Parameters:
-    - dataset_df (pd.DataFrame): DataFrame containing session data. Must include
-                                 columns for 'participant_id', 'ses' (session), and the specified QC column.
-    - which_qc_col (str): Name of the QC column to indicate QC status.
-
-    Returns:
-    - tuple:
-        - pd.DataFrame: DataFrame of unique sessions with an additional column 'session_passed' indicating
-                        if any run in the session passed QC.
-        - int: The total number of unique sessions.
-        - int: The number of unique sessions that passed QC.
-        - float: The percentage of unique sessions that passed QC.
-    """
-
-    # Fill in blank session labels with a default value
-    dataset_df["ses"] = dataset_df["ses"].fillna("ses1").replace("", "ses1")
-
-    # Calculate if any run in a session passed QC
-    session_passed = dataset_df.groupby(["participant_id", "ses"])[
-        which_qc_col
-    ].transform(lambda x: any(x))
-    dataset_df.loc[:, "session_passed"] = session_passed
-
-    # Drop duplicates to ensure each session is counted once
-    unique_sessions_df = dataset_df.drop_duplicates(subset=["participant_id", "ses"])
-
-    # Count total and passed sessions
-    total_sessions = len(unique_sessions_df)
-    passed_sessions = len(
-        unique_sessions_df[unique_sessions_df["session_passed"] == True]
-    )
-
-    # Calculate percentage of sessions that passed
-    if total_sessions > 0:
-        percentage_passed = (passed_sessions / total_sessions) * 100
-    else:
-        percentage_passed = 0
-
-    # Replace the dummy session variable
-    unique_sessions_df = unique_sessions_df.copy()
-    unique_sessions_df["ses"] = unique_sessions_df["ses"].replace("ses1", "")
-
-    return unique_sessions_df, total_sessions, passed_sessions, percentage_passed
-
-
-def summarise_subjects(dataset_df, unique_sessions_df):
-    """
-    Summarises the QC pass rates for unique subjects based on session data. For a given subject, they are counted as one pass if any session passed QC.
-
-    Parameters:
-    - dataset_df (pd.DataFrame): DataFrame containing subject data. Must include a
-                                 'participant_id' column.
-    - unique_sessions_df (pd.DataFrame): DataFrame of session data, including a 'session_passed'
-                                         column indicating if any run in the session passed QC.
-
-    Returns:
-    - tuple:
-        - int: The total number of unique subjects in dataset_df.
-        - int: The number of unique subjects with at least one session that passed QC.
-        - float: The percentage of unique subjects that passed QC based on session data.
-    """
-    # Total unique subjects
-    total_unique_subjects = dataset_df["participant_id"].nunique()
-
-    # Identify unique subjects that passed any session
-    passed_subjects_df = unique_sessions_df[
-        unique_sessions_df["session_passed"] == True
-    ]
-    unique_passed_subjects = passed_subjects_df["participant_id"].nunique()
-
-    # Calculate percentage of unique subjects that passed
-    if total_unique_subjects > 0:
-        percentage_unique_subjects_passed = (
-            unique_passed_subjects / total_unique_subjects
-        ) * 100
-    else:
-        percentage_unique_subjects_passed = 0
-
-    return (
-        total_unique_subjects,
-        unique_passed_subjects,
-        percentage_unique_subjects_passed,
-    )
-
-
-def summarise_passed_qc(merged_df, dataset, which_qc_col):
-    """
-    Generates a summary DataFrame indicating QC pass rates for both sessions and subjects within a specific dataset.
-
-    Parameters:
-    - merged_df (pd.DataFrame): Merged DataFrame containing both QC and phenotype data.
-    - dataset (str): Name of the dataset to filter for.
-    - which_qc_col (str): Name of the QC column to indicate QC status.
-
-    Returns:
-    - pd.DataFrame: A DataFrame containing a summary of QC pass rates, including the total number of sessions, the number of sessions that passed QC, the percentage of sessions that passed, the total number of subjects, the number of subjects that passed QC, and the percentage of subjects that passed QC for the specified dataset.
-    """
-    # Filter for the specified dataset
-    dataset_df = merged_df[merged_df["dataset"] == dataset].copy()
-
-    # Summarise unique session passes
-    unique_sessions_df, total_sessions, passed_sessions, percentage_passed = (
-        summarise_sessions(dataset_df, which_qc_col)
-    )
-    # Summarise unique subject passes
-    total_unique_subjects, unique_passed_subjects, percentage_unique_subjects_passed = (
-        summarise_subjects(dataset_df, unique_sessions_df)
-    )
-
-    # Create a summary df
-    qc_summary_df = pd.DataFrame(
-        [
-            {
-                "dataset": dataset,
-                "qc_column": which_qc_col,
-                "total_sessions": total_sessions,
-                "sessions_passed_qc (any 1 run)": passed_sessions,
-                "percentage_sessions_passed_qc": round(percentage_passed),
-                "total_subjects": total_unique_subjects,
-                "subjects_passed_qc (any 1 session)": unique_passed_subjects,
-                "percentage_subjects_passed_qc": round(
-                    percentage_unique_subjects_passed
-                ),
-            }
-        ]
-    )
-
-    return qc_summary_df
 
 
 if __name__ == "__main__":
@@ -270,34 +67,20 @@ if __name__ == "__main__":
     )  # dtype={"participant_id": str, "ses": str}
     frames_df = pd.read_csv(frames_p, sep="\t", dtype={"participant_id": str})
 
-    # Create df of pheno and qc results
+    # Merge pheno and qc data for each dataset
     master_df = pd.DataFrame()
     for dataset in datasets:
         pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
         pheno_p = args.root_p / pheno_p_template.format(dataset=dataset)
         pheno_df = pd.read_csv(pheno_p, sep="\t", dtype={"participant_id": str})
 
-        # if dataset == "adni":
-        if dataset == "oasis":
-            qc_df_filtered = qc_df[qc_df["dataset"] == dataset].copy()
-            qc_df_filtered["ses"] = pd.to_datetime(qc_df_filtered["ses"])
-            qc_df_filtered = qc_df_filtered.sort_values(by="ses")
-
-            pheno_df["ses"] = pd.to_datetime(pheno_df["ses"])
-            pheno_df = pheno_df.sort_values(by="ses")
-
-            merged_df = pd.merge_asof(
-                qc_df_filtered,
-                pheno_df,
-                by="participant_id",  # Match participants
-                on="ses",  # Find the nearest match based on session date
-                direction="nearest",
-                tolerance=pd.Timedelta(days=183),
-            )
+        qc_df_filtered = qc_df[qc_df["dataset"] == dataset].copy()
+        if dataset == "adni":
+            df = merge_adni(qc_df_filtered, pheno_df)
 
     # Save output
     # qc_summary_df.to_csv(output_p / "qc_summary.tsv", sep="\t", index=False)
     # matched_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
-    merged_df.to_csv(output_p / "test.tsv", sep="\t", index=False)
+    df.to_csv(output_p / "test.tsv", sep="\t", index=False)
 
     print(f"Data have been processed and output to {output_p}")
