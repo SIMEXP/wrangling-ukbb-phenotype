@@ -86,7 +86,9 @@ def process_data(root_p, output_p, metadata):
     df["diagnosis"] = df["DX"].replace({"Dementia": "ADD", "CN": "CON"})
     df["sex"] = df["PTGENDER"].map({"Female": "female", "Male": "male"})
     df["site"] = df["SITE"].astype(str)
-    df["participant_id"] = df["PTID"]
+    df["participant_id"] = df["PTID"].str.replace(
+        "_", "", regex=False
+    )  # So it matches the id in MRI file names
     df["education"] = df["PTEDUCAT"].astype(float)
     df["ses"] = df["EXAMDATE"]
     df["mmse"] = df["MMSE"]
