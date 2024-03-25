@@ -164,6 +164,7 @@ def process_data(root_p, output_p, metadata):
     diagnosis_df = pd.read_csv(diagnosis_p)
 
     # Merge demographics data into diagnosis data
+    demo_df = demo_df.drop_duplicates(subset="OASISID", keep="first")
     df = pd.merge(diagnosis_df, demo_df, on="OASISID", how="left")
 
     # Assign diagnoses based on codes
