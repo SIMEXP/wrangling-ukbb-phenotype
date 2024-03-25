@@ -73,9 +73,8 @@ def process_data(root_p, output_p, metadata):
     demo_df = pd.read_csv(demo_file_p, low_memory=False)
 
     # Calculate age on exam date from DOB, since only age at screening is provided in ADNIMERGE
-    demo_df = demo_df[["PTID", "PTDOB"]]
     demo_df = demo_df.drop_duplicates(subset="PTID", keep="first")
-    df = pd.merge(df, demo_df, on="PTID", how="left")
+    df = pd.merge(df, demo_df[["PTID", "PTDOB"]], on="PTID", how="left")
     df["PTDOB"] = pd.to_datetime(df["PTDOB"], format="%m/%Y")
     # Divide by np.timedelta64(1, 'Y') to convert the timedelta into years
     # Note this is an approximation, as it considers all years as 365.25 days, and 1st of the month is used for day since none provided
