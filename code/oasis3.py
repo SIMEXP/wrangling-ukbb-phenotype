@@ -1,6 +1,6 @@
 """Load OASIS3 data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-11
+Author: Natasha Clarke; last edit 2024-03-25
 
 All input stored in `data/oasis3` folder. The content of `data` is not
 included in the repository.
@@ -78,11 +78,15 @@ metadata = {
         "original_field_name": "EDUC",
         "description": "Years in education",
     },
+    "ses": {
+        "original_field_name": "contained in OASIS_session_label, e.g. in OAS30001_UDSd1_d0000, the session is d0000",
+        "description": "Session label, in this dataset days from entry into study",
+    },
 }
 
 
 def assign_diagnoses(df):
-    #   Any empty diagnoses remaining do not have a clear diagnosis, e.g. no data, or "DEMENTED" with no more detail. These will be assigned the closest diagnosis in date
+    #   Any empty diagnoses remaining do not have a clear diagnosis, e.g. no data, or "DEMENTED" with no more detail
 
     df["diagnosis"] = None
     #   Some rows have no primary diagnosis, so I assign these values first and if others exist they will get written over
@@ -150,99 +154,42 @@ def assign_diagnoses(df):
     return df
 
 
-def find_closest_date(participant_df, days_from_entry):
-    # Compute the absolute difference in days
-    participant_df["days_diff"] = (
-        participant_df["days_to_visit"] - days_from_entry
-    ).abs()
-
-    # Ensure there are non-NaN entries in 'days_diff' before finding the minimum
-    if participant_df["days_diff"].notna().any():
-        # Find the row with the smallest days difference
-        closest_row_index = participant_df["days_diff"].idxmin()
-        closest_row = participant_df.loc[closest_row_index]
-
-        # Return the diagnosis etc
-        return (
-            closest_row["diagnosis"],
-            closest_row["days_to_visit"],
-            closest_row["days_diff"],
-        )
-    else:
-        return None, None, None
-
-
-def find_closest_diagnosis(df_row, diagnosis_df):
-    participant_id = df_row["participant_id"]
-    days_from_entry = df_row["days_from_entry"]
-
-    # Filter to evaluations for the same participant where the diagnosis is not NULL
-    participant_df = diagnosis_df[
-        (diagnosis_df["OASISID"] == participant_id) & diagnosis_df["diagnosis"].notna()
-    ].copy()
-
-    if not participant_df.empty:
-        return find_closest_date(participant_df, days_from_entry)
-    else:
-        # Return None if no matching participant entries were found
-        return None, None, None
-
-
-def process_diagnosis_data(df, diagnosis_df):
-    # Assign diagnoses based on codes
-    diagnosis_df = assign_diagnoses(diagnosis_df)
-
-    # Match non-null entries with MR visit based on the smallest number of days difference
-    result = df.apply(lambda row: find_closest_diagnosis(row, diagnosis_df), axis=1)
-    result_df = pd.DataFrame(
-        result.tolist(), columns=["diagnosis", "days_to_visit", "days_diff"]
-    )
-    result_df.index = df.index
-
-    # Assign the results back to df
-    df[["diagnosis", "days_to_visit", "days_diff"]] = result_df
-
-    return df
-
-
 def process_data(root_p, output_p, metadata):
     # Paths to data
-    mri_p = root_p / "OASIS3_MR_json.csv"
     demo_p = root_p / "OASIS3_demographics.csv"
     diagnosis_p = root_p / "OASIS3_UDSd1_diagnoses.csv"
 
     # Load the CSVs
-    mri_df = pd.read_csv(mri_p)
     demo_df = pd.read_csv(demo_p)
     diagnosis_df = pd.read_csv(diagnosis_p)
 
-    # Match MR data with demographics data
-    mri_sessions_df = mri_df.groupby("label").first().reset_index()
-    df = demo_df.merge(
-        mri_sessions_df[["subject_id", "label"]],
-        left_on="OASISID",
-        right_on="subject_id",
-        how="outer",
-    )
+    # Merge demographics data into diagnosis data
+    df = pd.merge(diagnosis_df, demo_df, on="OASISID", how="left")
+
+    # Assign diagnoses based on codes
+    df = assign_diagnoses(df)
 
     # Process the data
     df["participant_id"] = df["OASISID"]
-    # Age: extract the number of days from the 'label' column from MRI data, calculate age at time of scan
-    df["days_from_entry"] = df["label"].str.extract("d(\d+)").astype(float)
-    df["age"] = (
-        (df["AgeatEntry"] + df["days_from_entry"] / 365.25).astype(float).round(1)
-    )
+    df["age"] = df["age at visit"]
     df["sex"] = df["GENDER"].map({2: "female", 1: "male"})
     df["site"] = "oasis3"  # There is only one site, and no name provided
     df["handedness"] = df["HAND"].map({"R": "right", "L": "left", "B": "ambidextrous"})
     df["education"] = pd.to_numeric(df["EDUC"])
-
-    # Match diagnoses
-    df = process_diagnosis_data(df, diagnosis_df)
+    df["ses"] = df["OASIS_session_label"].str.split("_").str[-1]
 
     # Select columns
     df = df[
-        ["participant_id", "age", "sex", "site", "diagnosis", "handedness", "education"]
+        [
+            "participant_id",
+            "age",
+            "sex",
+            "site",
+            "diagnosis",
+            "handedness",
+            "education",
+            "ses",
+        ]
     ]
 
     # Output tsv file
