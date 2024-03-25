@@ -1,6 +1,6 @@
 """Load CIMA-Q data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-05
+Author: Natasha Clarke; last edit 2024-03-25
 
 All input stored in `data/cimaq` folder. The content of `data` is not
 included in the repository.
