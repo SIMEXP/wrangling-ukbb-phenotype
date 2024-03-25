@@ -1,6 +1,6 @@
 """Load ADNI data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-05
+Author: Natasha Clarke; last edit 2024-03-25
 
 All input stored in `data/adni` folder. The content of `data` is not
 included in the repository.
@@ -14,155 +14,97 @@ diagnoses.
 """
 
 import pandas as pd
+import numpy as np
 import json
 import argparse
 from pathlib import Path
 
 # Define metadata
 metadata = {
-    "original_field_name": {
-        "adni_spreadsheet.csv": "Subject ID",
-        "ADNIMERGE_22Aug2023.csv": "PTID",
+    "participant_id": {
+        "original_field_name": "PTID",
+        "description": "Unique identifier for each participant",
     },
     "age": {
-        "original_field_name": "Age",
+        "original_field_name": "Calculated from PTDOB (date of birth) and EXAMDATE",
         "description": "Age of the participant in years",
     },
     "sex": {
-        "original_field_name": "Sex",
+        "original_field_name": "PTGENDER",
         "description": "Sex of the participant",
         "levels": {"male": "male", "female": "female"},
     },
     "site": {
-        "original_field_name": "Site is provided in the subject ID, e.g. for 011_S_0002 the site is 11",
+        "original_field_name": "SITE",
         "description": "Site of imaging data collection",
         "levels": "unable to find the matching site names. Acquisition sites can be found here: https://adni.loni.usc.edu/about/centers-cores/study-sites/",
     },
     "diagnosis": {
-        "original_field_name": "DX in ADNIMERGE_22Aug2023.csv, or Research Group in adni_spreadsheet.csv",
+        "original_field_name": "DX",
         "description": "Diagnosis of the participant",
         "levels": {
             "CON": "control",
             "ADD": "Alzheimer's disease dementia",
             "MCI": "mild cognitive impairment",
-            "Patient": "unknown",
         },
     },
     "education": {
         "original_field_name": "PTEDUCAT",
         "description": "Years in education",
     },
+    "ses": {
+        "original_field_name": "EXAMDATE",
+        "description": "Session label, in this dataset it is the date",
+    },
+    "mmse": {
+        "original_field_name": "MMSE",
+        "description": "Mini Mental State Examination score",
+    },
 }
 
 
-def find_closest_date(participant_df, scan_date):
-    # Compute the absolute difference in days between the scan date and diagnosis dates
-    participant_df["date_diff"] = (
-        participant_df["EXAMDATE"].sub(scan_date).dt.days.abs()
-    )
-
-    # Sort by date difference
-    participant_df.sort_values(by="date_diff", inplace=True)
-
-    # Filter for rows where DX is not blank, maintaining the order
-    valid_diagnosis_df = participant_df[
-        participant_df["DX"].notna() & (participant_df["DX"] != "")
-    ]
-
-    # Find the closest date with a valid diagnosis, if available
-    if not valid_diagnosis_df.empty:
-        closest_valid_diagnosis = valid_diagnosis_df.iloc[
-            0
-        ]  # First row is the closest with a valid DX
-        return (
-            closest_valid_diagnosis["DX"],
-            closest_valid_diagnosis["EXAMDATE"],
-            closest_valid_diagnosis["date_diff"],
-        )
-    else:
-        # Return None if no valid diagnosis is found
-        return None, None, None
-
-
-def find_closest_diagnosis(scan_row, diagnosis_df):
-    subject_id = scan_row["Subject ID"]
-    scan_date = scan_row["Study Date"]
-
-    # Filter to evaluations for the same participant where the evaluation date is not NULL
-    participant_df = diagnosis_df[
-        (diagnosis_df["PTID"] == subject_id) & diagnosis_df["EXAMDATE"].notna()
-    ].copy()
-
-    if not participant_df.empty:
-        return find_closest_date(participant_df, scan_date)
-    else:
-        # Return None if no matching participant entries were found
-        return None, None, None
-
-
-def process_diagnosis_data(scan_df, diagnosis_df):
-    # Apply function to match diagnoses according to closest scan date, and split the results into new columns
-    result = scan_df.apply(
-        lambda row: pd.Series(find_closest_diagnosis(row, diagnosis_df)), axis=1
-    )
-    scan_df[["diagnosis", "matched_evaluation_date", "date_diff"]] = (
-        result  # Returning these for now because at a later date we may want to drop e.g participants with diagnoses outside a certain window
-    )
-
-    # For those who only have screening visit, copy that diagnosis to column
-    scan_df.loc[scan_df["matched_evaluation_date"].isna(), "diagnosis"] = scan_df[
-        "Research Group"
-    ]
-
-    # Map values
-    scan_df["diagnosis"] = scan_df["diagnosis"].replace(
-        {"AD": "ADD", "CN": "CON", "EMCI": "MCI", "LMCI": "MCI", "Dementia": "ADD"}
-    )
-
-    return scan_df
-
-
 def process_data(root_p, output_p, metadata):
-    # Paths to different data files
-    scan_file_p = root_p / "adni_spreadsheet.csv"
-    diagnosis_file_p = root_p / "ADNIMERGE_22Aug2023.csv"
+    # Paths to data
+    merge_file_p = root_p / "ADNIMERGE_22Aug2023.csv"
+    demo_file_p = root_p / "PTDEMOG_25Mar2024.csv"
 
     # Load the CSVs
-    scan_df = pd.read_csv(scan_file_p, index_col=0, parse_dates=["Study Date"])
-    diagnosis_df = pd.read_csv(
-        diagnosis_file_p, low_memory=False, parse_dates=["EXAMDATE"]
-    )
+    df = pd.read_csv(merge_file_p, low_memory=False, parse_dates=["EXAMDATE"])
+    demo_df = pd.read_csv(demo_file_p, low_memory=False)
 
-    # Match diagnoses
-    df = process_diagnosis_data(scan_df, diagnosis_df)
-
-    # Get the education data
-    diagnosis_df = diagnosis_df.drop_duplicates(subset=["PTID"], keep="first")
-    df = pd.merge(
-        df,
-        diagnosis_df[["PTID", "PTEDUCAT"]],
-        left_on="Subject ID",
-        right_on="PTID",
-        how="left",
+    # Calculate age on exam date from DOB, since only age at screening is provided in ADNIMERGE
+    demo_df = demo_df[["PTID", "PTDOB"]]
+    demo_df = demo_df.drop_duplicates(subset="PTID", keep="first")
+    df = pd.merge(df, demo_df, on="PTID", how="left")
+    df["PTDOB"] = pd.to_datetime(df["PTDOB"], format="%m/%Y")
+    # Divide by np.timedelta64(1, 'Y') to convert the timedelta into years
+    # Note this is an approximation, as it considers all years as 365.25 days, and 1st of the month is used for day since none provided
+    df["age"] = (
+        ((df["EXAMDATE"] - df["PTDOB"]) / np.timedelta64(1, "Y")).astype(float).round(1)
     )
 
     # Process the data
-    df["age"] = df["Age"].astype(float)
-    df["sex"] = df["Sex"].map({"F": "female", "M": "male"})
-    df["site"] = (
-        df["Subject ID"].str.split("_").str[0].str.lstrip("0")
-    )  # Extract site variable from ID and remove leading zeros
-    df["participant_id"] = df["Subject ID"].str.replace("_", "", regex=False)
+    df["diagnosis"] = df["DX"].replace({"Dementia": "ADD", "CN": "CON"})
+    df["sex"] = df["PTGENDER"].map({"Female": "female", "Male": "male"})
+    df["site"] = df["SITE"].astype(str)
+    df["participant_id"] = df["PTID"]
     df["education"] = df["PTEDUCAT"].astype(float)
-    df["ses"] = df["Study Date"]
-
-    print(df.columns)
+    df["ses"] = df["EXAMDATE"]
+    df["mmse"] = df["MMSE"]
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis", "education", "ses"]]
-
-    # Sort df
-    df = df.sort_values(by=["participant_id", "age"])
+    df = df[
+        [
+            "participant_id",
+            "age",
+            "sex",
+            "site",
+            "diagnosis",
+            "education",
+            "ses",
+            "mmse",
+        ]
+    ]
 
     # Output tsv file
     df.to_csv(output_p / "adni_pheno.tsv", sep="\t", index=False)
