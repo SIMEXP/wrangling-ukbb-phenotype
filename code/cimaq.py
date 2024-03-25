@@ -22,7 +22,7 @@ metadata = {
         "description": "Unique identifier for each participant",
     },
     "age": {
-        "original_field_name": "age",
+        "original_field_name": "age_du_participant",
         "description": "Age of the participant in years",
     },
     "sex": {
@@ -61,69 +61,41 @@ metadata = {
         "original_field_name": "84756_nombre_annee_education",
         "description": "Years in education",
     },
+    "ses": {
+        "original_field_name": "no_visite",
+        "description": "Session label, in this dataset it is the visit label indicating months since baseline",
+    },
 }
 
 
-def find_closest_diagnosis(scan_row, diagnosis_df):
-    pscid = scan_row["pscid"]
-    scan_date = scan_row["date"]
-
-    # Filter to evaluations for the same participant and where the evaluation date is not NULL
-    participant_df = diagnosis_df[
-        (diagnosis_df["pscid"] == pscid) & diagnosis_df["date_de_l_évaluation"].notna()
-    ].copy()
-
-    # Find the closest date
-    if not participant_df.empty:
-        # Compute the absolute difference in days between the scan date and diagnosis evaluation dates
-        participant_df["date_diff"] = (
-            participant_df["date_de_l_évaluation"].sub(scan_date).dt.days.abs()
-        )
-
-        # Find the diagnosis with the smallest date difference
-        closest_date = participant_df.loc[participant_df["date_diff"].idxmin()]
-
-        # Return the diagnosis, date and numebr of days. Also return the sex info
-        return (
-            closest_date["22501_diagnostic_clinique"],
-            closest_date["date_de_l_évaluation"],
-            closest_date["date_diff"],
-            closest_date["sexe"],
-        )
-    else:
-        # Return None for each expected value to maintain consistency
-        return None, None, None
-
-
 def process_data(root_p, output_p, metadata):
-    # Paths to different data files
-    scan_file_p = root_p / "sommaire_des_scans.tsv"
+    # Paths to data files
     diagnosis_file_p = root_p / "22501_diagnostic_clinique.tsv"
+    scan_file_p = root_p / "sommaire_des_scans.tsv"
     socio_file_p = (
         root_p / "55398_informations_socio_demographiques_participant_initial.tsv"
     )
-    edu_file_p = root_p / "84756_variables_reserve_cognitive_bartres_initial.tsv"
+    cog_file_p = root_p / "84756_variables_reserve_cognitive_bartres_initial.tsv"
 
     # Load the CSVs
-    df = pd.read_csv(scan_file_p, sep="\t", parse_dates=["date"])
     diagnosis_df = pd.read_csv(
         diagnosis_file_p, sep="\t", parse_dates=["date_de_l_évaluation"]
     )
+    scan_df = pd.read_csv(scan_file_p, sep="\t")
     socio_df = pd.read_csv(socio_file_p, sep="\t")
-    edu_df = pd.read_csv(edu_file_p, sep="\t", encoding="ISO-8859-1")
+    cog_df = pd.read_csv(cog_file_p, sep="\t", encoding="ISO-8859-1")
 
-    # Select only resting state data
-    df = df[df["nii_protocole"] == "task-rest"]  # Run again for task-memory
-
-    # Apply function to match diagnoses according to closest scan date, and split the results into new columns
-    result = df.apply(
-        lambda row: pd.Series(find_closest_diagnosis(row, diagnosis_df)), axis=1
-    )
-    df[["diagnosis", "matched_evaluation_date", "date_diff", "sex"]] = (
-        result  # Returning these for now because at a later date we may want to drop e.g participants with diagnoses outside a certain window
+    # Match for site
+    scan_df = scan_df.drop_duplicates(subset="pscid", keep="first")
+    df = pd.merge(
+        diagnosis_df,
+        scan_df[["pscid", "centre"]],
+        on="pscid",
+        how="left",
     )
 
-    # Match with df for handedness
+    # Match for handedness
+    socio_df = socio_df.drop_duplicates(subset="PSCID", keep="first")
     df = pd.merge(
         df,
         socio_df[["PSCID", "55398_lateralite"]],
@@ -132,10 +104,11 @@ def process_data(root_p, output_p, metadata):
         how="left",
     )
 
-    # Match with df for education
+    # Match for education
+    cog_df = cog_df.drop_duplicates(subset="PSCID", keep="first")
     df = pd.merge(
         df,
-        edu_df[["PSCID", "84756_nombre_annee_education"]],
+        cog_df[["PSCID", "84756_nombre_annee_education"]],
         left_on="pscid",
         right_on="PSCID",
         how="left",
@@ -143,10 +116,10 @@ def process_data(root_p, output_p, metadata):
 
     # Process the data
     df["participant_id"] = df["pscid"].astype(str)
-    df["age"] = df["age"].astype(float)
-    df["sex"] = df["sex"].map({"femme": "female", "homme": "male"})
+    df["age"] = df["âge_du_participant"].astype(float)
+    df["sex"] = df["sexe"].map({"femme": "female", "homme": "male"})
     df["site"] = df["centre"]
-    df["diagnosis"] = df["diagnosis"].map(
+    df["diagnosis"] = df["22501_diagnostic_clinique"].map(
         {
             "démence_de_type_alzheimer-légère": "ADD(M)",
             "cognitivement_sain_(cs)": "CON",
@@ -162,10 +135,20 @@ def process_data(root_p, output_p, metadata):
     df["education"] = pd.to_numeric(
         df["84756_nombre_annee_education"], errors="coerce"
     )  # This will replace the "donnée_non_disponible" entries with NaN
+    df["ses"] = df["no_visite"]
 
     # Select columns
     df = df[
-        ["participant_id", "age", "sex", "site", "diagnosis", "handedness", "education"]
+        [
+            "participant_id",
+            "age",
+            "sex",
+            "site",
+            "diagnosis",
+            "handedness",
+            "education",
+            "ses",
+        ]
     ]
 
     # Output tsv file
