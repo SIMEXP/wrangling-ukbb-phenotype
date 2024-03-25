@@ -78,7 +78,7 @@ def create_master_df(root_p, qc_df, datasets, which_qc_col):
     Note:
     - Assumes that there is a phenotypic df available for each dataset.
     """
-    master_df = pd.DataFrame()
+    # master_df = pd.DataFrame()
     for dataset in datasets:
         pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
         pheno_p = args.root_p / pheno_p_template.format(dataset=dataset)
@@ -271,50 +271,33 @@ if __name__ == "__main__":
     frames_df = pd.read_csv(frames_p, sep="\t", dtype={"participant_id": str})
 
     # Create df of pheno and qc results
-    # First for cross sectional datasets
+    master_df = pd.DataFrame()
     for dataset in datasets:
-        if dataset in ["abide1", "abide2", "cobre", "hcpep", "srpbs", "ds000030"]:
-            cross_sectional_df = create_master_df(args.root_p, qc_df, datasets, which_qc_col)
+        pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
+        pheno_p = args.root_p / pheno_p_template.format(dataset=dataset)
+        pheno_df = pd.read_csv(pheno_p, sep="\t", dtype={"participant_id": str})
 
-        elif:
-            dataset == "adni": # etc, merge on session also. may have to use nearest
+        # if dataset == "adni":
+        if dataset == "oasis":
+            qc_df_filtered = qc_df[qc_df["dataset"] == dataset].copy()
+            qc_df_filtered["ses"] = pd.to_datetime(qc_df_filtered["ses"])
+            qc_df_filtered = qc_df_filtered.sort_values(by="ses")
 
-    master_df = pd.concat(cross_sectional_df, ...)
+            pheno_df["ses"] = pd.to_datetime(pheno_df["ses"])
+            pheno_df = pheno_df.sort_values(by="ses")
 
-    # Summarise QC results
-    qc_summary_df_list = []
-    for dataset in datasets:
-        qc_summary_df = summarise_passed_qc(master_df, dataset, which_qc_col)
-        qc_summary_df_list.append(qc_summary_df)
-
-    qc_summary_df = pd.concat(qc_summary_df_list, ignore_index=True)
-
-    # Filter df for scans that passed QC only, optionally for specific diagnoses
-    if diagnoses:
-        sub_df = filter_diagnoses(master_df, diagnoses)
-        filtered_df = sub_df[sub_df[which_qc_col] == True].copy()
-    else:
-        filtered_df = master_df[master_df[which_qc_col] == True].copy()
-
-    # Match QC df with frames df (total frames or number of frames remaining)
-    frames_df = frames_df.loc[frames_df["task"] == "rest"].copy()
-    matched_df = filtered_df.merge(
-        frames_df, on=["participant_id", "ses", "run", "dataset"], how="inner"
-    )
-
-    # Rework adni subject id's so they match other adni spreadsheets
-    matched_df["participant_id"] = matched_df.apply(
-        lambda row: (
-            row["participant_id"].split("S")[-1]
-            if row["dataset"] == "adni"
-            else row["participant_id"]
-        ),
-        axis=1,
-    )
+            merged_df = pd.merge_asof(
+                qc_df_filtered,
+                pheno_df,
+                by="participant_id",  # Match participants
+                on="ses",  # Find the nearest match based on session date
+                direction="nearest",
+                tolerance=pd.Timedelta(days=183),
+            )
 
     # Save output
-    qc_summary_df.to_csv(output_p / "qc_summary.tsv", sep="\t", index=False)
-    matched_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
-    # filtered_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
+    # qc_summary_df.to_csv(output_p / "qc_summary.tsv", sep="\t", index=False)
+    # matched_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
+    merged_df.to_csv(output_p / "test.tsv", sep="\t", index=False)
 
     print(f"Data have been processed and output to {output_p}")
