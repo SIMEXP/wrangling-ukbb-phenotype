@@ -1,6 +1,6 @@
 """Load HCP-EP data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-02-14
+Author: Natasha Clarke; last edit 2024-03-26
 
 All input stored in `data/hcpep` folder. The content of `data` is not
 included in the repository.
@@ -47,15 +47,8 @@ metadata = {
 }
 
 
-def process_data(root_p, output_p, metadata):
-    # Path to data
-    data_p = root_p / "ndar_subject01.txt"
-
-    # Load the data
-    df = pd.read_csv(data_p, delimiter="\t", header=[0, 1])
+def process_pheno(df):
     df.columns = df.columns.droplevel(1)  # Drop the second header
-
-    # Process the data
     df["participant_id"] = df["src_subject_id"].astype(str)
     df["age"] = (
         (df["interview_age"] / 12).astype(float).round(2)
@@ -73,9 +66,38 @@ def process_data(root_p, output_p, metadata):
 
     # Select columns
     df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
+    return df
+
+
+def merge_cross_sectional(qc_df_filtered, pheno_df):
+    # Merge pheno information into QC, for a dataset with only one session per subject
+    merged_df = pd.merge(qc_df_filtered, pheno_df, on="participant_id", how="left")
+
+    # Handle site columns
+    merged_df.drop(columns=["site_x"], inplace=True)
+    merged_df.rename(columns={"site_y": "site"}, inplace=True)
+    return merged_df
+
+
+def process_data(root_p, metadata):
+    # Paths to data
+    file_p = root_p / "wrangling-phenotype/data/hcpep/ndar_subject01.txt"
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
+    output_p = root_p / "wrangling-phenotype/outputs"
+
+    # Load the data
+    df = pd.read_csv(file_p, delimiter="\t", header=[0, 1])
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+
+    # Process pheno df
+    pheno_df = process_pheno(df)
+
+    # Merge pheno with qc
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "hcpep"].copy()
+    qc_pheno_df = merge_cross_sectional(qc_df_filtered, pheno_df)
 
     # Output tsv file
-    df.to_csv(output_p / "hcpep_pheno.tsv", sep="\t", index=False)
+    qc_pheno_df.to_csv(output_p / "hcpep_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "hcpep_pheno.json", "w") as f:
@@ -86,11 +108,9 @@ def process_data(root_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process HCP-EP phenotype data and output to TSV and JSON"
+        description="Process HCP-EP phenotype data, merge with QC and output to to TSV and JSON"
     )
-    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
-    parser.add_argument("output", type=Path, help="Path to the output directory")
-
+    parser.add_argument("rootpath", type=Path, help="Root path to files")
     args = parser.parse_args()
 
-    process_data(args.rootpath, args.output, metadata)
+    process_data(args.rootpath, metadata)
