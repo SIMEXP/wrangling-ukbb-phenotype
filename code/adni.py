@@ -63,26 +63,22 @@ metadata = {
 }
 
 
-def process_data(root_p, output_p, metadata):
-    # Paths to data
-    merge_file_p = root_p / "ADNIMERGE_22Aug2023.csv"
-    demo_file_p = root_p / "PTDEMOG_25Mar2024.csv"
-
-    # Load the CSVs
-    df = pd.read_csv(merge_file_p, low_memory=False, parse_dates=["EXAMDATE"])
-    demo_df = pd.read_csv(demo_file_p, low_memory=False)
-
+def calculate_age(adni_df, demo_df):
     # Calculate age on exam date from DOB, since only age at screening is provided in ADNIMERGE
     demo_df = demo_df.drop_duplicates(subset="PTID", keep="first")
-    df = pd.merge(df, demo_df[["PTID", "PTDOB"]], on="PTID", how="left")
-    df["PTDOB"] = pd.to_datetime(df["PTDOB"], format="%m/%Y")
+    adni_df = pd.merge(adni_df, demo_df[["PTID", "PTDOB"]], on="PTID", how="left")
+    adni_df["PTDOB"] = pd.to_datetime(adni_df["PTDOB"], format="%m/%Y")
     # Divide by np.timedelta64(1, 'Y') to convert the timedelta into years
     # Note this is an approximation, as it considers all years as 365.25 days, and 1st of the month is used for day since none provided
-    df["age"] = (
-        ((df["EXAMDATE"] - df["PTDOB"]) / np.timedelta64(1, "Y")).astype(float).round(1)
+    adni_df["age"] = (
+        ((adni_df["EXAMDATE"] - adni_df["PTDOB"]) / np.timedelta64(1, "Y"))
+        .astype(float)
+        .round(1)
     )
+    return adni_df
 
-    # Process the data
+
+def process_pheno(df):
     df["diagnosis"] = df["DX"].replace({"Dementia": "ADD", "CN": "CON"})
     df["sex"] = df["PTGENDER"].map({"Female": "female", "Male": "male"})
     df["site"] = df["SITE"].astype(str)
@@ -106,9 +102,51 @@ def process_data(root_p, output_p, metadata):
             "mmse",
         ]
     ]
+    return df
+
+
+def merge_adni(qc_df_filtered, pheno_df):
+    pheno_df["ses"] = pd.to_datetime(pheno_df["ses"])
+    qc_df_filtered["ses"] = pd.to_datetime(qc_df_filtered["ses"])
+
+    pheno_df = pheno_df.sort_values(by="ses")
+    qc_df_filtered = qc_df_filtered.sort_values(by="ses")
+
+    merged_df = pd.merge_asof(
+        qc_df_filtered,
+        pheno_df,
+        by="participant_id",  # Match participants
+        on="ses",  # Find the nearest match based on session date
+        direction="nearest",
+    )  # tolerance=pd.Timedelta(days=365),
+
+    # Handle site columns
+    merged_df.drop(columns=["site_x"], inplace=True)
+    merged_df.rename(columns={"site_y": "site"}, inplace=True)
+
+    return merged_df
+
+
+def process_data(root_p, metadata):
+    # Paths to data
+    adni_file_p = root_p / "wrangling-phenotype/data/adni/ADNIMERGE_22Aug2023.csv"
+    demo_file_p = root_p / "wrangling-phenotype/data/adni/PTDEMOG_25Mar2024.csv"
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
+    output_p = root_p / "wrangling-phenotype/outputs"
+
+    # Load the CSVs
+    adni_df = pd.read_csv(adni_file_p, low_memory=False, parse_dates=["EXAMDATE"])
+    demo_df = pd.read_csv(demo_file_p, low_memory=False)
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+
+    adni_df = calculate_age(adni_df, demo_df)
+    pheno_df = process_pheno(adni_df).copy()
+
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "adni"].copy()
+    qc_pheno_df = merge_adni(qc_df_filtered, pheno_df)
 
     # Output tsv file
-    df.to_csv(output_p / "adni_pheno.tsv", sep="\t", index=False)
+    qc_pheno_df.to_csv(output_p / "adni_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "adni_pheno.json", "w") as f:
@@ -119,11 +157,9 @@ def process_data(root_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process ADNI phenotype data and output to to TSV and JSON"
+        description="Process ADNI phenotype data, merge with QC and output to to TSV and JSON"
     )
-    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
-    parser.add_argument("output", type=Path, help="Path to the output directory")
-
+    parser.add_argument("rootpath", type=Path, help="Root path to files")
     args = parser.parse_args()
 
-    process_data(args.rootpath, args.output, metadata)
+    process_data(args.rootpath, metadata)
