@@ -249,7 +249,7 @@ def process_data(root_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process ADNI phenotype data, merge with QC and output to to TSV and JSON"
+        description="Process OASIS3 phenotype data, merge with QC and output to to TSV and JSON"
     )
     parser.add_argument("rootpath", type=Path, help="Root path to files")
     args = parser.parse_args()
