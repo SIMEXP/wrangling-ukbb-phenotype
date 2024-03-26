@@ -7,7 +7,10 @@ To run, needs:
 - rest_df.tsv, a TSV file of concatenated QC results, generated using qc_output/qc.ipynb
 - TSV of pheno data for each specificed dataset, generated using the corresponding script in this repo
 
-Author: Natasha Clarke; last edit 2024-03-12
+Note:
+- Currently diagnoses are matched to scans according to the nearest diagnosis, with no limit. The tolerance can be added to set a limit, e.g. within 1 year.
+
+Author: Natasha Clarke; last edit 2024-03-25
 
 """
 
@@ -17,11 +20,11 @@ from pathlib import Path
 
 
 def merge_adni(qc_df_filtered, pheno_df):
-    qc_df_filtered["ses"] = pd.to_datetime(qc_df_filtered["ses"])
-    qc_df_filtered = qc_df_filtered.sort_values(by="ses")
-
     pheno_df["ses"] = pd.to_datetime(pheno_df["ses"])
+    qc_df_filtered["ses"] = pd.to_datetime(qc_df_filtered["ses"])
+
     pheno_df = pheno_df.sort_values(by="ses")
+    qc_df_filtered = qc_df_filtered.sort_values(by="ses")
 
     merged_df = pd.merge_asof(
         qc_df_filtered,
@@ -29,8 +32,29 @@ def merge_adni(qc_df_filtered, pheno_df):
         by="participant_id",  # Match participants
         on="ses",  # Find the nearest match based on session date
         direction="nearest",
-        tolerance=pd.Timedelta(days=183),
+    )  # tolerance=pd.Timedelta(days=365),
+
+    return merged_df
+
+
+def merge_oasis3(qc_df_filtered, pheno_df):
+    pheno_df["ses_numeric"] = pheno_df["ses"].str.replace("d", "").astype(int)
+    qc_df_filtered["ses_numeric"] = (
+        qc_df_filtered["ses"].str.replace("d", "").astype(int)
     )
+
+    pheno_df = pheno_df.sort_values(by="ses_numeric")
+    qc_df_filtered = qc_df_filtered.sort_values(by="ses_numeric")
+
+    merged_df = pd.merge_asof(
+        qc_df_filtered,
+        pheno_df,
+        by="participant_id",  # Match participants
+        on="ses_numeric",  # Find the nearest match based on session date
+        direction="nearest",
+    )  # tolerance=365
+
+    merged_df["ses_numeric"] = pheno_df["ses"]
 
     return merged_df
 
@@ -68,7 +92,9 @@ if __name__ == "__main__":
     frames_df = pd.read_csv(frames_p, sep="\t", dtype={"participant_id": str})
 
     # Merge pheno and qc data for each dataset
+    df_list = []
     master_df = pd.DataFrame()
+
     for dataset in datasets:
         pheno_p_template = "wrangling-phenotype/outputs/{dataset}_pheno.tsv"
         pheno_p = args.root_p / pheno_p_template.format(dataset=dataset)
@@ -77,10 +103,18 @@ if __name__ == "__main__":
         qc_df_filtered = qc_df[qc_df["dataset"] == dataset].copy()
         if dataset == "adni":
             df = merge_adni(qc_df_filtered, pheno_df)
+            df_list.append(df)
+
+        elif dataset == "oasis3":
+            df = merge_oasis3(qc_df_filtered, pheno_df)
+            df_list.append(df)
+
+        master_df = pd.concat([master_df, df], ignore_index=True)
+    master_df = master_df.drop(columns=["site_x"])
 
     # Save output
     # qc_summary_df.to_csv(output_p / "qc_summary.tsv", sep="\t", index=False)
     # matched_df.to_csv(output_p / "passed_qc_master.tsv", sep="\t", index=False)
-    df.to_csv(output_p / "test.tsv", sep="\t", index=False)
+    master_df.to_csv(output_p / "test.tsv", sep="\t", index=False)
 
     print(f"Data have been processed and output to {output_p}")
