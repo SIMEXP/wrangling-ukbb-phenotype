@@ -77,16 +77,16 @@ def merge_cross_sectional(qc_df_filtered, pheno_df):
 
 def process_data(root_p, metadata):
     # Paths to data
-    pheno_file_p = root_p / "wrangling-phenotype/data/ds000030/participants.csv"
+    file_p = root_p / "wrangling-phenotype/data/ds000030/participants.csv"
     qc_file_p = root_p / "qc_output/rest_df.tsv"
     output_p = root_p / "wrangling-phenotype/outputs"
 
     # Load the CSVs
-    pheno_df = pd.read_csv(pheno_file_p)
+    df = pd.read_csv(file_p)
     qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
     # Process pheno df
-    pheno_df = process_pheno(pheno_df)
+    pheno_df = process_pheno(df)
 
     # Merge pheno with qc
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "ds000030"].copy()
