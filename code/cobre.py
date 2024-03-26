@@ -82,16 +82,16 @@ def merge_cross_sectional(qc_df_filtered, pheno_df):
 
 def process_data(root_p, metadata):
     # Path to data
-    pheno_file_p = root_p / "wrangling-phenotype/data/cobre/COBRE_phenotypic_data.csv"
+    file_p = root_p / "wrangling-phenotype/data/cobre/COBRE_phenotypic_data.csv"
     qc_file_p = root_p / "qc_output/rest_df.tsv"
     output_p = root_p / "wrangling-phenotype/outputs"
 
     # Load the CSVs
-    pheno_df = pd.read_csv(pheno_file_p, dtype=str)
+    df = pd.read_csv(file_p, dtype=str)
     qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
     # Process pheno df
-    pheno_df = process_pheno(pheno_df)
+    pheno_df = process_pheno(df)
 
     # Merge pheno with qc
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "cobre"].copy()
