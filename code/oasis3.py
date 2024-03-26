@@ -87,7 +87,6 @@ metadata = {
 
 def assign_diagnoses(df):
     #   Any empty diagnoses remaining do not have a clear diagnosis, e.g. no data, or "DEMENTED" with no more detail
-
     df["diagnosis"] = None
     #   Some rows have no primary diagnosis, so I assign these values first and if others exist they will get written over
     df.loc[(df["PROBAD"] == 1), "diagnosis"] = "ADD"
@@ -154,15 +153,7 @@ def assign_diagnoses(df):
     return df
 
 
-def process_data(root_p, output_p, metadata):
-    # Paths to data
-    demo_p = root_p / "OASIS3_demographics.csv"
-    diagnosis_p = root_p / "OASIS3_UDSd1_diagnoses.csv"
-
-    # Load the CSVs
-    demo_df = pd.read_csv(demo_p)
-    diagnosis_df = pd.read_csv(diagnosis_p)
-
+def process_pheno(demo_df, diagnosis_df):
     # Merge demographics data into diagnosis data
     demo_df = demo_df.drop_duplicates(subset="OASISID", keep="first")
     df = pd.merge(diagnosis_df, demo_df, on="OASISID", how="left")
@@ -170,7 +161,7 @@ def process_data(root_p, output_p, metadata):
     # Assign diagnoses based on codes
     df = assign_diagnoses(df)
 
-    # Process the data
+    # Process pheno columns
     df["participant_id"] = df["OASISID"]
     df["age"] = df["age at visit"]
     df["sex"] = df["GENDER"].map({2: "female", 1: "male"})
@@ -192,9 +183,62 @@ def process_data(root_p, output_p, metadata):
             "ses",
         ]
     ]
+    return df
+
+
+def merge_oasis3(qc_df_filtered, pheno_df):
+    # Create a numeric version of the "days from entry" session
+    pheno_df["ses_numeric"] = pheno_df["ses"].str.replace("d", "").astype(int)
+    qc_df_filtered["ses_numeric"] = (
+        qc_df_filtered["ses"].str.replace("d", "").astype(int)
+    )
+
+    pheno_df = pheno_df.sort_values(by="ses_numeric")
+    qc_df_filtered = qc_df_filtered.sort_values(by="ses_numeric")
+
+    merged_df = pd.merge_asof(
+        qc_df_filtered,
+        pheno_df,
+        by="participant_id",  # Match participants
+        on="ses_numeric",  # Find the nearest match based on session date
+        direction="nearest",
+    )  # tolerance=365
+
+    # Handle site columns
+    merged_df.drop(columns=["site_x"], inplace=True)
+    merged_df.rename(columns={"site_y": "site"}, inplace=True)
+
+    # Handle session columns
+    merged_df.drop(columns=["ses_y"], inplace=True)
+    merged_df.rename(columns={"ses_x": "ses"}, inplace=True)
+    merged_df.drop(columns=["ses_numeric"], inplace=True)
+
+    return merged_df
+
+
+def process_data(root_p, metadata):
+    # Paths to data
+    diagnosis_file_p = (
+        root_p / "wrangling-phenotype/data/oasis3/OASIS3_UDSd1_diagnoses.csv"
+    )
+    demo_file_p = root_p / "wrangling-phenotype/data/oasis3/OASIS3_demographics.csv"
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
+    output_p = root_p / "wrangling-phenotype/outputs"
+
+    # Load the CSVs
+    diagnosis_df = pd.read_csv(diagnosis_file_p)
+    demo_df = pd.read_csv(demo_file_p)
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+
+    # Create pheno df
+    pheno_df = process_pheno(demo_df, diagnosis_df)
+
+    # Merge pheno with qc
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "oasis3"].copy()
+    qc_pheno_df = merge_oasis3(qc_df_filtered, pheno_df)
 
     # Output tsv file
-    df.to_csv(output_p / "oasis3_pheno.tsv", sep="\t", index=False)
+    qc_pheno_df.to_csv(output_p / "oasis3_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "oasis3_pheno.json", "w") as f:
@@ -205,11 +249,9 @@ def process_data(root_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process OASIS3 phenotype data and output to TSV and JSON"
+        description="Process ADNI phenotype data, merge with QC and output to to TSV and JSON"
     )
-    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
-    parser.add_argument("output", type=Path, help="Path to the output directory")
-
+    parser.add_argument("rootpath", type=Path, help="Root path to files")
     args = parser.parse_args()
 
-    process_data(args.rootpath, args.output, metadata)
+    process_data(args.rootpath, metadata)
