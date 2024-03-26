@@ -153,14 +153,7 @@ def assign_diagnoses(df):
     return df
 
 
-def process_pheno(demo_df, diagnosis_df):
-    # Merge demographics data into diagnosis data
-    demo_df = demo_df.drop_duplicates(subset="OASISID", keep="first")
-    df = pd.merge(diagnosis_df, demo_df, on="OASISID", how="left")
-
-    # Assign diagnoses based on codes
-    df = assign_diagnoses(df)
-
+def process_pheno(df):
     # Process pheno columns
     df["participant_id"] = df["OASISID"]
     df["age"] = df["age at visit"]
@@ -183,7 +176,7 @@ def process_pheno(demo_df, diagnosis_df):
             "ses",
         ]
     ]
-    return df
+    return df.copy()
 
 
 def merge_oasis3(qc_df_filtered, pheno_df):
@@ -230,8 +223,15 @@ def process_data(root_p, metadata):
     demo_df = pd.read_csv(demo_file_p)
     qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
+    # Merge demographics data into diagnosis data
+    demo_df = demo_df.drop_duplicates(subset="OASISID", keep="first")
+    df = pd.merge(diagnosis_df, demo_df, on="OASISID", how="left")
+
+    # Assign diagnoses based on codes
+    df = assign_diagnoses(df)
+
     # Create pheno df
-    pheno_df = process_pheno(demo_df, diagnosis_df)
+    pheno_df = process_pheno(df)
 
     # Merge pheno with qc
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "oasis3"].copy()
