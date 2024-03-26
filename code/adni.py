@@ -139,9 +139,11 @@ def process_data(root_p, metadata):
     demo_df = pd.read_csv(demo_file_p, low_memory=False)
     qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
+    # Calculate age on session date, and create pheno df
     adni_df = calculate_age(adni_df, demo_df)
     pheno_df = process_pheno(adni_df).copy()
 
+    # Merge pheno with qc
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "adni"].copy()
     qc_pheno_df = merge_adni(qc_df_filtered, pheno_df)
 
