@@ -1,6 +1,6 @@
 """Load COBRE data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-04
+Author: Natasha Clarke; last edit 2024-03-26
 
 All input stored in `data/cobre` folder. The content of `data` is not
 included in the repository.
@@ -14,6 +14,7 @@ import pandas as pd
 import json
 import argparse
 from pathlib import Path
+
 
 # Define metadata
 metadata = {
@@ -47,16 +48,12 @@ metadata = {
 }
 
 
-def process_data(root_p, output_p, metadata):
-    # Path to data
-    data_p = root_p / "COBRE_phenotypic_data.csv"
-
-    # Load the CSV and rename first column
-    df = pd.read_csv(data_p, dtype=str)
+def process_pheno(df):
+    # Add name for id column
     df.rename(columns={df.columns[0]: "participant_id"}, inplace=True)
 
-    # Filter out any subjects who disenrolled
-    df = df[df["Current Age"] != "Disenrolled"]
+    # Filter out any subjects who disenrolled (there is no pheno data for them)
+    df = df[df["Current Age"] != "Disenrolled"].copy()
 
     # Process the data
     df["participant_id"] = df["participant_id"].astype(str)
@@ -70,9 +67,38 @@ def process_data(root_p, output_p, metadata):
 
     # Select columns
     df = df[["participant_id", "age", "sex", "site", "diagnosis", "handedness"]]
+    return df
+
+
+def merge_cross_sectional(qc_df_filtered, pheno_df):
+    # Merge pheno information into QC, for a dataset with only one session per subject
+    merged_df = pd.merge(qc_df_filtered, pheno_df, on="participant_id", how="left")
+
+    # Handle site columns
+    merged_df.drop(columns=["site_x"], inplace=True)
+    merged_df.rename(columns={"site_y": "site"}, inplace=True)
+    return merged_df
+
+
+def process_data(root_p, metadata):
+    # Path to data
+    pheno_file_p = root_p / "wrangling-phenotype/data/cobre/COBRE_phenotypic_data.csv"
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
+    output_p = root_p / "wrangling-phenotype/outputs"
+
+    # Load the CSVs
+    pheno_df = pd.read_csv(pheno_file_p, dtype=str)
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+
+    # Process pheno df
+    pheno_df = process_pheno(pheno_df)
+
+    # Merge pheno with qc
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "cobre"].copy()
+    qc_pheno_df = merge_cross_sectional(qc_df_filtered, pheno_df)
 
     # Output tsv file
-    df.to_csv(output_p / "cobre_pheno.tsv", sep="\t", index=False)
+    qc_pheno_df.to_csv(output_p / "cobre_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "cobre_pheno.json", "w") as f:
@@ -83,11 +109,9 @@ def process_data(root_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process COBRE phenotype data and output to to TSV and JSON"
+        description="Process COBRE phenotype data, merge with QC and output to to TSV and JSON"
     )
-    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
-    parser.add_argument("output", type=Path, help="Path to the output directory")
-
+    parser.add_argument("rootpath", type=Path, help="Root path to files")
     args = parser.parse_args()
 
-    process_data(args.rootpath, args.output, metadata)
+    process_data(args.rootpath, metadata)
