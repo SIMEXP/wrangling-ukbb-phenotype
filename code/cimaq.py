@@ -1,6 +1,6 @@
 """Load CIMA-Q data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-25
+Author: Natasha Clarke; last edit 2024-03-26
 
 All input stored in `data/cimaq` folder. The content of `data` is not
 included in the repository.
@@ -68,27 +68,12 @@ metadata = {
 }
 
 
-def process_data(root_p, output_p, metadata):
-    # Paths to data files
-    diagnosis_file_p = root_p / "22501_diagnostic_clinique.tsv"
-    scan_file_p = root_p / "sommaire_des_scans.tsv"
-    socio_file_p = (
-        root_p / "55398_informations_socio_demographiques_participant_initial.tsv"
-    )
-    cog_file_p = root_p / "84756_variables_reserve_cognitive_bartres_initial.tsv"
-
-    # Load the CSVs
-    diagnosis_df = pd.read_csv(
-        diagnosis_file_p, sep="\t", parse_dates=["date_de_l_évaluation"]
-    )
-    scan_df = pd.read_csv(scan_file_p, sep="\t")
-    socio_df = pd.read_csv(socio_file_p, sep="\t")
-    cog_df = pd.read_csv(cog_file_p, sep="\t", encoding="ISO-8859-1")
-
+def merge_pheno(scan_df, diagnosis_df, socio_df, cog_df):
+    df = diagnosis_df.copy()
     # Match for site
     scan_df = scan_df.drop_duplicates(subset="pscid", keep="first")
     df = pd.merge(
-        diagnosis_df,
+        df,
         scan_df[["pscid", "centre"]],
         on="pscid",
         how="left",
@@ -113,7 +98,10 @@ def process_data(root_p, output_p, metadata):
         right_on="PSCID",
         how="left",
     )
+    return df
 
+
+def process_pheno(df):
     # Process the data
     df["participant_id"] = df["pscid"].astype(str)
     df["age"] = df["âge_du_participant"].astype(float)
@@ -150,9 +138,76 @@ def process_data(root_p, output_p, metadata):
             "ses",
         ]
     ]
+    return df.copy()
+
+
+def merge_cimaq(qc_df_filtered, pheno_df):
+    # Create a numeric version of the session
+    pheno_df["ses_numeric"] = pheno_df["ses"].str.replace("V", "").astype(int)
+    qc_df_filtered["ses_numeric"] = (
+        qc_df_filtered["ses"].str.replace("V", "").astype(int)
+    )
+
+    pheno_df = pheno_df.sort_values(by="ses_numeric")
+    qc_df_filtered = qc_df_filtered.sort_values(by="ses_numeric")
+
+    merged_df = pd.merge_asof(
+        qc_df_filtered,
+        pheno_df,
+        by="participant_id",  # Match participants
+        on="ses_numeric",  # Find the nearest match based on session date
+        direction="nearest",
+    )  # tolerance=12 if we wanted one year, since sessions are in months
+
+    # Handle site columns
+    merged_df.drop(columns=["site_x"], inplace=True)
+    merged_df.rename(columns={"site_y": "site"}, inplace=True)
+
+    # Handle session columns
+    merged_df.drop(columns=["ses_y"], inplace=True)
+    merged_df.rename(columns={"ses_x": "ses"}, inplace=True)
+    merged_df.drop(columns=["ses_numeric"], inplace=True)
+    return merged_df
+
+
+def process_data(root_p, metadata):
+    # Paths to data
+    diagnosis_file_p = (
+        root_p / "wrangling-phenotype/data/cimaq/22501_diagnostic_clinique.tsv"
+    )
+    scan_file_p = root_p / "wrangling-phenotype/data/cimaq/sommaire_des_scans.tsv"
+    socio_file_p = (
+        root_p
+        / "wrangling-phenotype/data/cimaq/55398_informations_socio_demographiques_participant_initial.tsv"
+    )
+    cog_file_p = (
+        root_p
+        / "wrangling-phenotype/data/cimaq/84756_variables_reserve_cognitive_bartres_initial.tsv"
+    )
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
+    output_p = root_p / "wrangling-phenotype/outputs"
+
+    # Load the CSVs
+    diagnosis_df = pd.read_csv(
+        diagnosis_file_p, sep="\t", parse_dates=["date_de_l_évaluation"]
+    )
+    scan_df = pd.read_csv(scan_file_p, sep="\t")
+    socio_df = pd.read_csv(socio_file_p, sep="\t")
+    cog_df = pd.read_csv(cog_file_p, sep="\t", encoding="ISO-8859-1")
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+
+    # Merge different phenotypic fields
+    df = merge_pheno(scan_df, diagnosis_df, socio_df, cog_df)
+
+    # Process pheno data
+    pheno_df = process_pheno(df)
+
+    # Merge pheno with qc
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "cimaq"].copy()
+    qc_pheno_df = merge_cimaq(qc_df_filtered, pheno_df)
 
     # Output tsv file
-    df.to_csv(output_p / "cimaq_pheno.tsv", sep="\t", index=False)
+    qc_pheno_df.to_csv(output_p / "cimaq_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "cimaq_pheno.json", "w") as f:
@@ -163,11 +218,9 @@ def process_data(root_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process CIMA-Q phenotype data and output to TSV and JSON"
+        description="Process CIMS-Q phenotype data, merge with QC and output to to TSV and JSON"
     )
-    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
-    parser.add_argument("output", type=Path, help="Path to the output directory")
-
+    parser.add_argument("rootpath", type=Path, help="Root path to files")
     args = parser.parse_args()
 
-    process_data(args.rootpath, args.output, metadata)
+    process_data(args.rootpath, metadata)
