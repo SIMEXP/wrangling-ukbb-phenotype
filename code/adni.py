@@ -22,7 +22,10 @@ from pathlib import Path
 # Define metadata
 metadata = {
     "participant_id": {
-        "original_field_name": "PTID",
+        "original_field_name": {
+            "adni_spreadsheet.csv": "Subject ID",
+            "ADNIMERGE_22Aug2023.csv": "PTID",
+        },
         "description": "Unique identifier for each participant",
     },
     "age": {
@@ -40,7 +43,10 @@ metadata = {
         "levels": "unable to find the matching site names. Acquisition sites can be found here: https://adni.loni.usc.edu/about/centers-cores/study-sites/",
     },
     "diagnosis": {
-        "original_field_name": "DX",
+        "original_field_name": {
+            "adni_spreadsheet.csv": "Research Group",
+            "ADNIMERGE_22Aug2023.csv": "DX",
+        },
         "description": "Diagnosis of the participant",
         "levels": {
             "CON": "control",
@@ -55,10 +61,6 @@ metadata = {
     "ses": {
         "original_field_name": "EXAMDATE",
         "description": "Session label, in this dataset it is the date",
-    },
-    "mmse": {
-        "original_field_name": "MMSE",
-        "description": "Mini Mental State Examination score",
     },
 }
 
@@ -78,16 +80,43 @@ def calculate_age(adni_df, demo_df):
     return adni_df
 
 
-def process_pheno(df):
-    df["diagnosis"] = df["DX"].replace({"Dementia": "ADD", "CN": "CON"})
+def process_pheno(df, screening_df):
+    # Diagnosis == DX in ADNIMERGE. These do not include screening diagnoses, so if it's missing we get it from adni_spreadsheet.csv
+    df.rename(columns={"PTID": "participant_id", "DX": "diagnosis"}, inplace=True)
+    screening_df.rename(columns={"Subject ID": "participant_id"}, inplace=True)
+
+    # Merge "Research Group" column into pheno
+    df = pd.merge(
+        df,
+        screening_df[["participant_id", "Research Group"]],
+        on="participant_id",
+        how="left",
+    )
+
+    # Fill missing 'diagnosis' values with 'Research Group'
+    df["diagnosis"] = df["diagnosis"].fillna(df["Research Group"])
+
+    # Re-code diagnoses
+    df["diagnosis"].replace(
+        {
+            "Dementia": "ADD",
+            "AD": "ADD",
+            "EMCI": "MCI",
+            "LMCI": "MCI",
+            "CN": "CON",
+            "SMC": "CON",
+        },
+        inplace=True,
+    )  # SMC (subjective impairment) was only used at screening and all went on to be classed as controls
+
     df["sex"] = df["PTGENDER"].map({"Female": "female", "Male": "male"})
     df["site"] = df["SITE"].astype(str)
-    df["participant_id"] = df["PTID"].str.replace(
-        "_", "", regex=False
-    )  # So it matches the id in MRI file names
     df["education"] = df["PTEDUCAT"].astype(float)
     df["ses"] = df["EXAMDATE"]
-    df["mmse"] = df["MMSE"]
+
+    df["participant_id"] = df["participant_id"].str.replace(
+        "_", "", regex=False
+    )  # So it matches the id in MRI file names
 
     # Select columns
     df = df[
@@ -99,7 +128,6 @@ def process_pheno(df):
             "diagnosis",
             "education",
             "ses",
-            "mmse",
         ]
     ]
     return df
@@ -131,17 +159,21 @@ def process_data(root_p, metadata):
     # Paths to data
     adni_file_p = root_p / "wrangling-phenotype/data/adni/ADNIMERGE_22Aug2023.csv"
     demo_file_p = root_p / "wrangling-phenotype/data/adni/PTDEMOG_25Mar2024.csv"
+    screening_file_p = root_p / "wrangling-phenotype/data/adni/adni_spreadsheet.csv"
     qc_file_p = root_p / "qc_output/rest_df.tsv"
     output_p = root_p / "wrangling-phenotype/outputs"
 
     # Load the CSVs
     adni_df = pd.read_csv(adni_file_p, low_memory=False, parse_dates=["EXAMDATE"])
     demo_df = pd.read_csv(demo_file_p, low_memory=False)
+    screening_df = pd.read_csv(screening_file_p)
     qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
-    # Calculate age on session date, and create pheno df
+    # Calculate age on session date
     adni_df = calculate_age(adni_df, demo_df)
-    pheno_df = process_pheno(adni_df).copy()
+
+    # Process diagnosis data and other columns
+    pheno_df = process_pheno(adni_df, screening_df).copy()
 
     # Merge pheno with qc
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "adni"].copy()
