@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import util
 from pathlib import Path
 
 
@@ -26,7 +27,6 @@ def map_values(df):
 
 
 def cimaq_npi_to_mbi(df):
-    # Calculate MBI domains
     df["decreased_motivation"] = df["22901_apathie"]
     df["emotional_dysregulation"] = (
         df["22901_depression_dysphorie"] + df["22901_anxiete"] + df["22901_euphorie"]
@@ -41,3 +41,73 @@ def cimaq_npi_to_mbi(df):
         df["22901_idees_delirantes"] + df["22901_hallucinations"]
     )
     return df
+
+
+def select_columns(df):
+    columns = [
+        "pscid",
+        "no_visite",
+        "decreased_motivation",
+        "emotional_dysregulation",
+        "impulse_dyscontrol",
+        "social_inappropriateness",
+        "abnormal_perception",
+        "mbi_total_score",
+        "mbi_status",
+    ]
+    df = df[columns].copy()
+    return df
+
+
+# set paths
+npi_p = Path(
+    "/home/neuromod/wrangling-phenotype/data/cimaq/22901_inventaire_neuropsychiatrique_q.tsv"
+)
+qc_pheno_p = Path("/home/neuromod/wrangling-phenotype/outputs/passed_qc_master.tsv")
+output_p = Path("/home/neuromod/wrangling-phenotype/test.tsv")
+
+# load data
+npi_df = pd.read_csv(npi_p, sep="\t")
+qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t")
+
+# convert NPI to MBI and calculate total score
+npi_df = map_values(npi_df)
+mbi_df = cimaq_npi_to_mbi(npi_df)
+mbi_df = util.calculate_mbi_score(mbi_df)
+mbi_df = select_columns(mbi_df)
+
+# Rename columns in mbi_df so they match
+mbi_df.rename(columns={"pscid": "participant_id"}, inplace=True)
+mbi_df.rename(columns={"no_visite": "ses"}, inplace=True)
+
+# Filter to only cimaq rows
+qc_df_filtered = qc_pheno_df.loc[qc_pheno_df["dataset"] == "cimaq"].copy()
+
+# Format id (must be numeric for merging)
+mbi_df["participant_id"] = mbi_df["participant_id"].astype(int)
+qc_df_filtered["participant_id"] = qc_df_filtered["participant_id"].astype(int)
+
+# Strip the 'V' from ses and convert to integer
+mbi_df["ses_numeric"] = mbi_df["ses"].str.lstrip("V").astype(int)
+qc_df_filtered["ses_numeric"] = qc_df_filtered["ses"].str.lstrip("V").astype(int)
+
+# Ensure ordered by ses
+qc_df_filtered = qc_df_filtered.sort_values(by=["ses_numeric"])
+mbi_df = mbi_df.sort_values(by=["ses_numeric"])
+
+# Merge to get nearest mbi result within 6 months
+merged_df = pd.merge_asof(
+    qc_df_filtered,
+    mbi_df,
+    by="participant_id",
+    on="ses_numeric",
+    direction="nearest",
+    tolerance=(6),
+)
+
+# Handle session columns
+merged_df.drop(columns=["ses_y"], inplace=True)
+merged_df.rename(columns={"ses_x": "ses"}, inplace=True)
+merged_df.drop(columns=["ses_numeric"], inplace=True)
+
+merged_df.to_csv(output_p, sep="\t", index=False)
