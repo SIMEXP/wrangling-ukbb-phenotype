@@ -1,10 +1,14 @@
 import pandas as pd
 import numpy as np
+import argparse
 import util
 from pathlib import Path
 
 
 def map_values(df):
+    # Drop rows with some data unavailable
+    df = df[df["22901_score"] != "donnée_non_disponible"].copy()
+
     # Map scores to numerical values
     mapping = {"0_non": 0, "1_oui_léger": 1, "2_oui_modéré": 2, "3_oui_sévère": 3}
 
@@ -59,55 +63,76 @@ def select_columns(df):
     return df
 
 
-# set paths
-npi_p = Path(
-    "/home/neuromod/wrangling-phenotype/data/cimaq/22901_inventaire_neuropsychiatrique_q.tsv"
-)
-qc_pheno_p = Path("/home/neuromod/wrangling-phenotype/outputs/passed_qc_master.tsv")
-output_p = Path("/home/neuromod/wrangling-phenotype/test.tsv")
+def cimaq_merge_mbi_qc(qc_pheno_df, mbi_df):
+    # Filter to only cimaq rows
+    qc_df_filtered = qc_pheno_df.loc[qc_pheno_df["dataset"] == "cimaq"].copy()
 
-# load data
-npi_df = pd.read_csv(npi_p, sep="\t")
-qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t")
+    # Rename columns in mbi_df so they match
+    mbi_df.rename(columns={"pscid": "participant_id"}, inplace=True)
+    mbi_df.rename(columns={"no_visite": "ses"}, inplace=True)
 
-# convert NPI to MBI and calculate total score
-npi_df = map_values(npi_df)
-mbi_df = cimaq_npi_to_mbi(npi_df)
-mbi_df = util.calculate_mbi_score(mbi_df)
-mbi_df = select_columns(mbi_df)
+    # Format id
+    mbi_df["participant_id"] = mbi_df["participant_id"].astype(int)
+    qc_df_filtered["participant_id"] = qc_df_filtered["participant_id"].astype(int)
 
-# Rename columns in mbi_df so they match
-mbi_df.rename(columns={"pscid": "participant_id"}, inplace=True)
-mbi_df.rename(columns={"no_visite": "ses"}, inplace=True)
+    # Strip the 'V' from ses and convert to integer
+    mbi_df["ses_numeric"] = mbi_df["ses"].str.lstrip("V").astype(int)
+    qc_df_filtered["ses_numeric"] = qc_df_filtered["ses"].str.lstrip("V").astype(int)
 
-# Filter to only cimaq rows
-qc_df_filtered = qc_pheno_df.loc[qc_pheno_df["dataset"] == "cimaq"].copy()
+    # Ensure ordered by session
+    qc_df_filtered = qc_df_filtered.sort_values(by=["ses_numeric"])
+    mbi_df = mbi_df.sort_values(by=["ses_numeric"])
 
-# Format id (must be numeric for merging)
-mbi_df["participant_id"] = mbi_df["participant_id"].astype(int)
-qc_df_filtered["participant_id"] = qc_df_filtered["participant_id"].astype(int)
+    # Merge to get nearest mbi result within 6 months
+    merged_df = pd.merge_asof(
+        qc_df_filtered,
+        mbi_df,
+        by="participant_id",
+        on="ses_numeric",
+        direction="nearest",
+        tolerance=(6),
+    )
 
-# Strip the 'V' from ses and convert to integer
-mbi_df["ses_numeric"] = mbi_df["ses"].str.lstrip("V").astype(int)
-qc_df_filtered["ses_numeric"] = qc_df_filtered["ses"].str.lstrip("V").astype(int)
+    # Handle session columns
+    merged_df.drop(columns=["ses_y"], inplace=True)
+    merged_df.rename(columns={"ses_x": "ses"}, inplace=True)
+    merged_df.drop(columns=["ses_numeric"], inplace=True)
 
-# Ensure ordered by ses
-qc_df_filtered = qc_df_filtered.sort_values(by=["ses_numeric"])
-mbi_df = mbi_df.sort_values(by=["ses_numeric"])
+    return merged_df
 
-# Merge to get nearest mbi result within 6 months
-merged_df = pd.merge_asof(
-    qc_df_filtered,
-    mbi_df,
-    by="participant_id",
-    on="ses_numeric",
-    direction="nearest",
-    tolerance=(6),
-)
 
-# Handle session columns
-merged_df.drop(columns=["ses_y"], inplace=True)
-merged_df.rename(columns={"ses_x": "ses"}, inplace=True)
-merged_df.drop(columns=["ses_numeric"], inplace=True)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Convert NPI to MBI, merge with QC and pheno data for OASIS3"
+    )
+    parser.add_argument("rootpath", type=Path, help="Root path")
 
-merged_df.to_csv(output_p, sep="\t", index=False)
+    args = parser.parse_args()
+    root_p = args.rootpath
+
+    # Set paths
+    npi_p = root_p / "data/cimaq/22901_inventaire_neuropsychiatrique_q.tsv"
+    qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
+    output_p = root_p / "outputs/final_cimaq.tsv"
+
+    # Load CSVs
+    npi_df = pd.read_csv(npi_p, sep="\t")
+    qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t")
+
+    # Convert NPI to MBI and calculate total score
+    npi_df = map_values(npi_df)
+    mbi_df = cimaq_npi_to_mbi(npi_df)
+    mbi_df = util.calculate_mbi_score(mbi_df)
+    mbi_df = select_columns(mbi_df)
+
+    merged_df = cimaq_merge_mbi_qc(qc_pheno_df, mbi_df)
+
+    # Select scans. For controls, we take the first available scan. For MCI and ADD, take the first with an MBI score
+    final_cimaq = (
+        merged_df.groupby(["participant_id"], as_index=False)
+        .apply(util.select_row)
+        .reset_index(drop=True)
+    )
+
+    # Save the final DataFrame
+    final_cimaq.to_csv(output_p, sep="\t", index=False)
