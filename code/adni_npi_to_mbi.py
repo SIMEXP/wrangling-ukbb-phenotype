@@ -101,5 +101,5 @@ if __name__ == "__main__":
         .reset_index(drop=True)
     )
 
-    # Save the final DataFrame
+    # Output df
     final_adni.to_csv(output_p, sep="\t", index=False)
