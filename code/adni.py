@@ -65,35 +65,55 @@ metadata = {
 }
 
 
-def calculate_age(adni_df, demo_df):
+def calculate_age(adnimerge_df, demo_df):
     # Calculate age on exam date from DOB, since only age at screening is provided in ADNIMERGE
     demo_df = demo_df.drop_duplicates(subset="PTID", keep="first")
-    adni_df = pd.merge(adni_df, demo_df[["PTID", "PTDOB"]], on="PTID", how="left")
-    adni_df["PTDOB"] = pd.to_datetime(adni_df["PTDOB"], format="%m/%Y")
+    adnimerge_df = pd.merge(
+        adnimerge_df, demo_df[["PTID", "PTDOB"]], on="PTID", how="left"
+    )
+    adnimerge_df["PTDOB"] = pd.to_datetime(adnimerge_df["PTDOB"], format="%m/%Y")
     # Divide by np.timedelta64(1, 'Y') to convert the timedelta into years
     # Note this is an approximation, as it considers all years as 365.25 days, and 1st of the month is used for day since none provided
-    adni_df["age"] = (
-        ((adni_df["EXAMDATE"] - adni_df["PTDOB"]) / np.timedelta64(1, "Y"))
+    adnimerge_df["age"] = (
+        ((adnimerge_df["EXAMDATE"] - adnimerge_df["PTDOB"]) / np.timedelta64(1, "Y"))
         .astype(float)
         .round(1)
     )
-    return adni_df
+    return adnimerge_df
 
 
-def process_pheno(df, screening_df):
-    # Diagnosis == DX in ADNIMERGE. These do not include screening diagnoses, so if it's missing we get it from adni_spreadsheet.csv
-    df.rename(columns={"PTID": "participant_id", "DX": "diagnosis"}, inplace=True)
-    screening_df.rename(columns={"Subject ID": "participant_id"}, inplace=True)
-
-    # Merge "Research Group" column into pheno
-    df = pd.merge(
-        df,
-        screening_df[["participant_id", "Research Group"]],
-        on="participant_id",
-        how="left",
+def process_pheno(adnimerge_df, adni_df):
+    # In adnimerge Diagnosis == DX. These do not include screening diagnoses, so if it's missing we get the nearest one from adni_spreadsheet.csv:
+    adnimerge_df.rename(
+        columns={"PTID": "participant_id", "DX": "diagnosis", "EXAMDATE": "ses"},
+        inplace=True,
+    )
+    adni_df.rename(
+        columns={"Subject ID": "participant_id", "Study Date": "ses"}, inplace=True
     )
 
-    # Fill missing 'diagnosis' values with 'Research Group'
+    # Select only needed columns
+    adni_df = adni_df[["participant_id", "ses", "Research Group"]].copy()
+
+    # Convert sessions to datetime
+    adnimerge_df["ses"] = pd.to_datetime(adnimerge_df["ses"])
+    adni_df["ses"] = pd.to_datetime(adni_df["ses"])
+
+    # Ensure ordered by session
+    adnimerge_df = adnimerge_df.sort_values(by=["ses"])
+    adni_df = adni_df.sort_values(by=["ses"])
+
+    # Merge "Research Group" from adni_spreadsheet.csv into adnimerge, within 1 year
+    df = pd.merge_asof(
+        adnimerge_df,
+        adni_df,
+        by="participant_id",
+        on="ses",
+        direction="nearest",
+        tolerance=pd.Timedelta(days=365.25),
+    )
+
+    # Use this value if DX is missing only
     df["diagnosis"] = df["diagnosis"].fillna(df["Research Group"])
 
     # Re-code diagnoses
@@ -112,8 +132,6 @@ def process_pheno(df, screening_df):
     df["sex"] = df["PTGENDER"].map({"Female": "female", "Male": "male"})
     df["site"] = df["SITE"].astype(str)
     df["education"] = df["PTEDUCAT"].astype(float)
-    df["ses"] = df["EXAMDATE"]
-
     df["participant_id"] = df["participant_id"].str.replace(
         "_", "", regex=False
     )  # So it matches the id in MRI file names
@@ -133,18 +151,24 @@ def process_pheno(df, screening_df):
     return df
 
 
-def merge_adni(qc_df_filtered, pheno_df):
+def merge_adni(qc_df, pheno_df):
+    # Filter to rows for adni
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "adni"].copy()
+
+    # Ensure session is in datetime
     pheno_df["ses"] = pd.to_datetime(pheno_df["ses"])
     qc_df_filtered["ses"] = pd.to_datetime(qc_df_filtered["ses"])
 
+    # Ensure sorted by session
     pheno_df = pheno_df.sort_values(by="ses")
     qc_df_filtered = qc_df_filtered.sort_values(by="ses")
 
+    # Find the nearest match based on session date
     merged_df = pd.merge_asof(
         qc_df_filtered,
         pheno_df,
         by="participant_id",  # Match participants
-        on="ses",  # Find the nearest match based on session date
+        on="ses",
         direction="nearest",
     )  # tolerance=pd.Timedelta(days=365),
 
@@ -157,27 +181,28 @@ def merge_adni(qc_df_filtered, pheno_df):
 
 def process_data(root_p, metadata):
     # Paths to data
-    adni_file_p = root_p / "wrangling-phenotype/data/adni/ADNIMERGE_22Aug2023.csv"
+    adnimerge_file_p = root_p / "wrangling-phenotype/data/adni/ADNIMERGE_22Aug2023.csv"
     demo_file_p = root_p / "wrangling-phenotype/data/adni/PTDEMOG_25Mar2024.csv"
-    screening_file_p = root_p / "wrangling-phenotype/data/adni/adni_spreadsheet.csv"
+    adni_file_p = root_p / "wrangling-phenotype/data/adni/adni_spreadsheet.csv"
     qc_file_p = root_p / "qc_output/rest_df.tsv"
     output_p = root_p / "wrangling-phenotype/outputs"
 
     # Load the CSVs
-    adni_df = pd.read_csv(adni_file_p, low_memory=False, parse_dates=["EXAMDATE"])
+    adnimerge_df = pd.read_csv(
+        adnimerge_file_p, low_memory=False, parse_dates=["EXAMDATE"]
+    )
     demo_df = pd.read_csv(demo_file_p, low_memory=False)
-    screening_df = pd.read_csv(screening_file_p)
+    adni_df = pd.read_csv(adni_file_p)
     qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
     # Calculate age on session date
-    adni_df = calculate_age(adni_df, demo_df)
+    adnimerge_df = calculate_age(adnimerge_df, demo_df)
 
     # Process diagnosis data and other columns
-    pheno_df = process_pheno(adni_df, screening_df).copy()
+    pheno_df = process_pheno(adnimerge_df, adni_df).copy()
 
     # Merge pheno with qc
-    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "adni"].copy()
-    qc_pheno_df = merge_adni(qc_df_filtered, pheno_df)
+    qc_pheno_df = merge_adni(qc_df, pheno_df)
 
     # Output tsv file
     qc_pheno_df.to_csv(output_p / "adni_qc_pheno.tsv", sep="\t", index=False)
