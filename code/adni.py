@@ -163,14 +163,15 @@ def merge_adni(qc_df, pheno_df):
     pheno_df = pheno_df.sort_values(by="ses")
     qc_df_filtered = qc_df_filtered.sort_values(by="ses")
 
-    # Find the nearest match based on session date
+    # Find the nearest match based on session date, with a year
     merged_df = pd.merge_asof(
         qc_df_filtered,
         pheno_df,
         by="participant_id",  # Match participants
         on="ses",
         direction="nearest",
-    )  # tolerance=pd.Timedelta(days=365),
+        tolerance=pd.Timedelta(days=365.25),
+    )
 
     # Handle site columns
     merged_df.drop(columns=["site_x"], inplace=True)
