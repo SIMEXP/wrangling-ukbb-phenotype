@@ -1,6 +1,6 @@
 """Load ADNI data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-25
+Author: Natasha Clarke; last edit 2024-04-08
 
 All input stored in `data/adni` folder. The content of `data` is not
 included in the repository.
@@ -163,21 +163,46 @@ def merge_adni(qc_df, pheno_df):
     pheno_df = pheno_df.sort_values(by="ses")
     qc_df_filtered = qc_df_filtered.sort_values(by="ses")
 
-    # Find the nearest match based on session date, with a year
+    # Copy the ses column so we can use it later to calculate difference
+    pheno_df["ses_pheno"] = pheno_df["ses"]
+
+    # Merge pheno and QC on nearest. Rather than setting a tolerance here we calculate the difference later, since e.g. sex does not change
     merged_df = pd.merge_asof(
         qc_df_filtered,
         pheno_df,
         by="participant_id",  # Match participants
         on="ses",
         direction="nearest",
-        tolerance=pd.Timedelta(days=365.25),
     )
 
     # Handle site columns
     merged_df.drop(columns=["site_x"], inplace=True)
     merged_df.rename(columns={"site_y": "site"}, inplace=True)
 
+    # Calculate difference
+    merged_df["difference"] = (merged_df["ses"] - merged_df["ses_pheno"]).abs()
+    merged_df.drop(columns=["ses_pheno"], inplace=True)
+
     return merged_df
+
+
+def apply_threshold(df):
+    # For controls we allow a diagnosis within two years, for other diagnoses it must be one
+    mask_con = (df["diagnosis"] == "CON") & (
+        df["difference"] < pd.to_timedelta("365.25 days")
+    )
+    mask_other = (df["diagnosis"] != "CON") & (
+        df["difference"] < pd.to_timedelta("730.5 days")
+    )
+
+    # Filter the df
+    filtered_df = df[mask_con | mask_other]
+
+    # Drop the difference column as no longer needed
+    filtered_df = filtered_df.copy()
+    filtered_df.drop(columns=["difference"], inplace=True)
+
+    return filtered_df
 
 
 def process_data(root_p, metadata):
@@ -205,8 +230,14 @@ def process_data(root_p, metadata):
     # Merge pheno with qc
     qc_pheno_df = merge_adni(qc_df, pheno_df)
 
+    # Apply threshold for time between scan and phenotyping. The threshold can be changed in the function
+    filtered_df = apply_threshold(qc_pheno_df)
+
+    # Optionally, drop any scans where the subject has no diagnosis
+    final_df = filtered_df.dropna(subset=["diagnosis"]).copy()
+
     # Output tsv file
-    qc_pheno_df.to_csv(output_p / "adni_qc_pheno.tsv", sep="\t", index=False)
+    final_df.to_csv(output_p / "adni_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "adni_pheno.json", "w") as f:
