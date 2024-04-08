@@ -63,7 +63,7 @@ def adni_merge_mbi_qc(qc_pheno_df, mbi_df):
         by="RID",
         on="ses",
         direction="nearest",
-        tolerance=pd.Timedelta(days=183),  # Approximately 6 months
+        tolerance=pd.Timedelta(days=183),
     )
 
     return merged_df
