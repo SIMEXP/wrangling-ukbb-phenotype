@@ -189,24 +189,45 @@ def merge_oasis3(qc_df_filtered, pheno_df):
     pheno_df = pheno_df.sort_values(by="ses_numeric")
     qc_df_filtered = qc_df_filtered.sort_values(by="ses_numeric")
 
+    # Merge pheno and QC on nearest. Rather than setting a tolerance here we calculate the difference later, since e.g. sex does not change
     merged_df = pd.merge_asof(
         qc_df_filtered,
         pheno_df,
         by="participant_id",  # Match participants
         on="ses_numeric",  # Find the nearest match based on session date
         direction="nearest",
-    )  # tolerance=365
+    )
 
     # Handle site columns
     merged_df.drop(columns=["site_x"], inplace=True)
     merged_df.rename(columns={"site_y": "site"}, inplace=True)
 
-    # Handle session columns
+    # Calculate difference (convert to float so it handles NaNs)
+    merged_df.rename(columns={"ses_numeric": "ses_scan"}, inplace=True)
+    merged_df["ses_pheno"] = merged_df["ses_y"].str.replace("d", "").astype(float)
+    merged_df["difference"] = (merged_df["ses_scan"] - merged_df["ses_pheno"]).abs()
+
     merged_df.drop(columns=["ses_y"], inplace=True)
     merged_df.rename(columns={"ses_x": "ses"}, inplace=True)
-    merged_df.drop(columns=["ses_numeric"], inplace=True)
+    merged_df.drop(columns=["ses_scan"], inplace=True)
+    merged_df.drop(columns=["ses_pheno"], inplace=True)
 
     return merged_df
+
+
+def apply_threshold(df):
+    # For controls we allow a diagnosis within two years, for other diagnoses it must be one
+    mask_con = (df["diagnosis"] == "CON") & (df["difference"] < 730.5)
+    mask_other = (df["diagnosis"] != "CON") & (df["difference"] < 365.25)
+
+    # Filter the df
+    filtered_df = df[mask_con | mask_other]
+
+    # Drop the difference column as no longer needed
+    filtered_df = filtered_df.copy()
+    filtered_df.drop(columns=["difference"], inplace=True)
+
+    return filtered_df
 
 
 def process_data(root_p, metadata):
@@ -237,8 +258,14 @@ def process_data(root_p, metadata):
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "oasis3"].copy()
     qc_pheno_df = merge_oasis3(qc_df_filtered, pheno_df)
 
+    # Apply threshold for time between scan and phenotyping. The threshold can be changed in the function
+    filtered_df = apply_threshold(qc_pheno_df)
+
+    # Optionally, drop any scans where the subject has no diagnosis
+    final_df = filtered_df.dropna(subset=["diagnosis"]).copy()
+
     # Output tsv file
-    qc_pheno_df.to_csv(output_p / "oasis3_qc_pheno.tsv", sep="\t", index=False)
+    final_df.to_csv(output_p / "oasis3_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "oasis3_pheno.json", "w") as f:
