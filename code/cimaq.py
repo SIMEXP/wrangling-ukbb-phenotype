@@ -1,6 +1,6 @@
 """Load CIMA-Q data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-26
+Author: Natasha Clarke; last edit 2024-04-08
 
 All input stored in `data/cimaq` folder. The content of `data` is not
 included in the repository.
@@ -151,13 +151,14 @@ def merge_cimaq(qc_df_filtered, pheno_df):
     pheno_df = pheno_df.sort_values(by="ses_numeric")
     qc_df_filtered = qc_df_filtered.sort_values(by="ses_numeric")
 
+    # Merge pheno and QC on nearest. Note that since the longest difference between scanning and pheno collection is 3 months, we don't need to set a threshold for the diagnoses
     merged_df = pd.merge_asof(
         qc_df_filtered,
         pheno_df,
         by="participant_id",  # Match participants
         on="ses_numeric",  # Find the nearest match based on session date
         direction="nearest",
-    )  # tolerance=12 if we wanted one year, since sessions are in months
+    )
 
     # Handle site columns
     merged_df.drop(columns=["site_x"], inplace=True)
