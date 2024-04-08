@@ -1,6 +1,6 @@
 """Load OASIS3 data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-03-25
+Author: Natasha Clarke; last edit 2024-04-08
 
 All input stored in `data/oasis3` folder. The content of `data` is not
 included in the repository.
