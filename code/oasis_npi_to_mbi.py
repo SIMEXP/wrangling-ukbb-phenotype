@@ -32,7 +32,7 @@ def select_columns(df):
 
 
 def oasis_merge_mbi_qc(qc_pheno_df, mbi_df):
-    # Filter qc to only cimaq rows
+    # Filter qc to only oasis rows
     qc_df_filtered = qc_pheno_df.loc[qc_pheno_df["dataset"] == "oasis3"].copy()
 
     # Rename columns in mbi_df so they match
