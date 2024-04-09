@@ -32,11 +32,9 @@ def select_columns(df):
 
 
 def adni_merge_mbi_qc(qc_pheno_df, mbi_df):
-    # Filter qc to only adni rows
     # Grab just the ID part from participant_id, so it matches mbi_df
-    qc_df_filtered = qc_pheno_df.loc[qc_pheno_df["dataset"] == "adni"].copy()
-    qc_df_filtered["RID"] = (
-        qc_df_filtered["participant_id"].str.split("S").str[-1].astype(int)
+    qc_pheno_df["RID"] = (
+        qc_pheno_df["participant_id"].str.split("S").str[-1].astype(int)
     )
 
     # Rename date field so it matches
@@ -48,17 +46,17 @@ def adni_merge_mbi_qc(qc_pheno_df, mbi_df):
     mbi_df["ses"] = mbi_df["ses"].replace("0013-10-28", "2013-10-28")
 
     # Convert sessions to datetime
-    qc_df_filtered["ses"] = pd.to_datetime(qc_df_filtered["ses"])
+    qc_pheno_df["ses"] = pd.to_datetime(qc_pheno_df["ses"])
     mbi_df["ses"] = pd.to_datetime(mbi_df["ses"])
 
     # Ensure ordered by session
-    qc_df_filtered = qc_df_filtered.sort_values(by=["ses"])
+    qc_pheno_df = qc_pheno_df.sort_values(by=["ses"])
     mbi_df = mbi_df.dropna(subset=["ses"])  # Since some were missing
     mbi_df = mbi_df.sort_values(by=["ses"])
 
     # Merge to get nearest mbi result within 6 months
     merged_df = pd.merge_asof(
-        qc_df_filtered,
+        qc_pheno_df,
         mbi_df,
         by="RID",
         on="ses",
@@ -80,7 +78,7 @@ if __name__ == "__main__":
 
     # Set paths
     npi_p = root_p / "data/adni/NPI_22Aug2023.csv"
-    qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
+    qc_pheno_p = root_p / "outputs/adni_qc_pheno.tsv"
     output_p = root_p / "outputs/final_adni.tsv"
 
     # load data
