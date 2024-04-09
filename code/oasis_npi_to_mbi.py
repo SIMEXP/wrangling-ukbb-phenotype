@@ -32,24 +32,21 @@ def select_columns(df):
 
 
 def oasis_merge_mbi_qc(qc_pheno_df, mbi_df):
-    # Filter qc to only oasis rows
-    qc_df_filtered = qc_pheno_df.loc[qc_pheno_df["dataset"] == "oasis3"].copy()
-
     # Rename columns in mbi_df so they match
     mbi_df.rename(columns={"OASISID": "participant_id"}, inplace=True)
     mbi_df.rename(columns={"days_to_visit": "ses"}, inplace=True)
 
     # Convert ses to integer and strip the d where necessary
     mbi_df["ses_numeric"] = mbi_df["ses"].astype(int)
-    qc_df_filtered["ses_numeric"] = qc_df_filtered["ses"].str.lstrip("d").astype(int)
+    qc_pheno_df["ses_numeric"] = qc_pheno_df["ses"].str.lstrip("d").astype(int)
 
     # Ensure ordered by session
-    qc_df_filtered = qc_df_filtered.sort_values(by=["ses_numeric"])
+    qc_pheno_df = qc_pheno_df.sort_values(by=["ses_numeric"])
     mbi_df = mbi_df.sort_values(by=["ses_numeric"])
 
     # Merge to get nearest mbi result within 6 months
     merged_df = pd.merge_asof(
-        qc_df_filtered,
+        qc_pheno_df,
         mbi_df,
         by="participant_id",
         on="ses_numeric",
@@ -108,7 +105,7 @@ if __name__ == "__main__":
 
     # Set paths
     npi_p = root_p / "data/oasis3/OASIS3_UDSb5_npiq.csv"
-    qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
+    qc_pheno_p = root_p / "outputs/oasis3_qc_pheno.tsv"
     output_p = root_p / "outputs/final_oasis.tsv"
 
     # Load CSVs
