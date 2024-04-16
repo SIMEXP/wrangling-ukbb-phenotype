@@ -184,17 +184,17 @@ def merge_scanner(qc_df_filtered, scan_df):
     scan_df["participant_id"] = scan_df["label"].apply(lambda x: x.split("_")[0])
     scan_df["ses"] = scan_df["label"].apply(lambda x: x.split("_")[-1])
 
-    # Create a new 'scanner' column combining information
+    # Create scanner column
     scan_df["scanner"] = (
         scan_df["Manufacturer"] + "_" + scan_df["ManufacturersModelName"]
-    )
-
-    # Select necessary columns
-    scan_df = scan_df[["participant_id", "ses", "scanner"]].copy()
+    ).str.lower()
 
     # Step 3: Merge with qc_df_filtered on 'participant_id' and 'ses'
     merged_df = pd.merge(
-        qc_df_filtered, scan_df, on=["participant_id", "ses"], how="left"
+        qc_df_filtered,
+        scan_df[["participant_id", "ses", "scanner"]],
+        on=["participant_id", "ses"],
+        how="left",
     )
 
     return merged_df
