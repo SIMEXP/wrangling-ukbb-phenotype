@@ -1,6 +1,6 @@
 """Load CIMA-Q data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-04-08
+Author: Natasha Clarke; last edit 2024-04-16
 
 All input stored in `data/cimaq` folder. The content of `data` is not
 included in the repository.
@@ -70,11 +70,12 @@ metadata = {
 
 def merge_pheno(scan_df, diagnosis_df, socio_df, cog_df):
     df = diagnosis_df.copy()
+
     # Match for site
-    scan_df = scan_df.drop_duplicates(subset="pscid", keep="first")
+    scan_df_first = scan_df.drop_duplicates(subset="pscid", keep="first")
     df = pd.merge(
         df,
-        scan_df[["pscid", "centre"]],
+        scan_df_first[["pscid", "centre"]],
         on="pscid",
         how="left",
     )
@@ -141,12 +142,36 @@ def process_pheno(df):
     return df.copy()
 
 
-def merge_cimaq(qc_df_filtered, pheno_df):
+def merge_scan(scan_df, qc_df_filtered):
+    # Create scanner column
+    scan_df["scanner"] = (
+        scan_df["fabriquant"].str.replace(" ", "_")
+        + "_"
+        + scan_df["modele_scanner"].str.replace(" ", "_")
+    ).str.lower()
+
+    qc_df_filtered["participant_id"] = qc_df_filtered["participant_id"].astype(int)
+    scan_df["pscid"] = scan_df["pscid"].astype(int)
+
+    merged_df = pd.merge(
+        qc_df_filtered,
+        scan_df[["pscid", "session", "scanner"]],
+        left_on=["participant_id", "ses"],
+        right_on=["pscid", "session"],
+        how="left",
+    )
+
+    return merged_df
+
+
+def merge_qc_pheno(qc_df_filtered, pheno_df):
     # Create a numeric version of the session
     pheno_df["ses_numeric"] = pheno_df["ses"].str.replace("V", "").astype(int)
     qc_df_filtered["ses_numeric"] = (
         qc_df_filtered["ses"].str.replace("V", "").astype(int)
     )
+
+    pheno_df["participant_id"] = pheno_df["participant_id"].astype(int)
 
     pheno_df = pheno_df.sort_values(by="ses_numeric")
     qc_df_filtered = qc_df_filtered.sort_values(by="ses_numeric")
@@ -203,9 +228,14 @@ def process_data(root_p, metadata):
     # Process pheno data
     pheno_df = process_pheno(df)
 
-    # Merge pheno with qc
+    # Filter qc df for dataset
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "cimaq"].copy()
-    qc_pheno_df = merge_cimaq(qc_df_filtered, pheno_df)
+
+    # Merge with scan info
+    qc_scan_df = merge_scan(scan_df, qc_df_filtered)
+
+    # Merge pheno with qc
+    qc_pheno_df = merge_qc_pheno(qc_scan_df, pheno_df)
 
     # Output tsv file
     qc_pheno_df.to_csv(output_p / "cimaq_qc_pheno.tsv", sep="\t", index=False)
