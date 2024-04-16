@@ -142,28 +142,6 @@ def process_pheno(df):
     return df.copy()
 
 
-def merge_scan(scan_df, qc_df_filtered):
-    # Create scanner column
-    scan_df["scanner"] = (
-        scan_df["fabriquant"].str.replace(" ", "_")
-        + "_"
-        + scan_df["modele_scanner"].str.replace(" ", "_")
-    ).str.lower()
-
-    qc_df_filtered["participant_id"] = qc_df_filtered["participant_id"].astype(int)
-    scan_df["pscid"] = scan_df["pscid"].astype(int)
-
-    merged_df = pd.merge(
-        qc_df_filtered,
-        scan_df[["pscid", "session", "scanner"]],
-        left_on=["participant_id", "ses"],
-        right_on=["pscid", "session"],
-        how="left",
-    )
-
-    return merged_df
-
-
 def merge_qc_pheno(qc_df_filtered, pheno_df):
     # Create a numeric version of the session
     pheno_df["ses_numeric"] = pheno_df["ses"].str.replace("V", "").astype(int)
@@ -172,6 +150,7 @@ def merge_qc_pheno(qc_df_filtered, pheno_df):
     )
 
     pheno_df["participant_id"] = pheno_df["participant_id"].astype(int)
+    qc_df_filtered["participant_id"] = qc_df_filtered["participant_id"].astype(int)
 
     pheno_df = pheno_df.sort_values(by="ses_numeric")
     qc_df_filtered = qc_df_filtered.sort_values(by="ses_numeric")
@@ -193,6 +172,33 @@ def merge_qc_pheno(qc_df_filtered, pheno_df):
     merged_df.drop(columns=["ses_y"], inplace=True)
     merged_df.rename(columns={"ses_x": "ses"}, inplace=True)
     merged_df.drop(columns=["ses_numeric"], inplace=True)
+    return merged_df
+
+
+def merge_scanner(qc_pheno_df, scan_df):
+    # Create scanner column
+    scan_df["scanner"] = (
+        scan_df["fabriquant"].str.replace(" ", "_")
+        + "_"
+        + scan_df["modele_scanner"].str.replace(" ", "_")
+    ).str.lower()
+
+    qc_pheno_df["participant_id"] = qc_pheno_df["participant_id"].astype(int)
+    scan_df["pscid"] = scan_df["pscid"].astype(int)
+
+    merged_df = pd.merge(
+        qc_pheno_df,
+        scan_df[["pscid", "session", "scanner"]],
+        left_on=["participant_id", "ses"],
+        right_on=["pscid", "session"],
+        how="left",
+    )
+
+    # Create variable of site and scanner info for ComBat
+    merged_df["site_scanner"] = (
+        merged_df["site"] + "_" + merged_df["scanner"]
+    ).str.lower()
+
     return merged_df
 
 
@@ -231,14 +237,14 @@ def process_data(root_p, metadata):
     # Filter qc df for dataset
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "cimaq"].copy()
 
-    # Merge with scan info
-    qc_scan_df = merge_scan(scan_df, qc_df_filtered)
-
     # Merge pheno with qc
-    qc_pheno_df = merge_qc_pheno(qc_scan_df, pheno_df)
+    qc_pheno_df = merge_qc_pheno(qc_df_filtered, pheno_df)
+
+    # Merge with scan info
+    qc_scan_df = merge_scanner(qc_pheno_df, scan_df)
 
     # Output tsv file
-    qc_pheno_df.to_csv(output_p / "cimaq_qc_pheno.tsv", sep="\t", index=False)
+    qc_scan_df.to_csv(output_p / "cimaq_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "cimaq_pheno.json", "w") as f:
