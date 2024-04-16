@@ -179,13 +179,35 @@ def process_pheno(df):
     return df.copy()
 
 
-def merge_oasis3(qc_df_filtered, pheno_df):
+def merge_scanner(qc_df_filtered, scan_df):
+    # Create 'participant_id' and 'ses' columns in the oasis scan info for merging
+    scan_df["participant_id"] = scan_df["label"].apply(lambda x: x.split("_")[0])
+    scan_df["ses"] = scan_df["label"].apply(lambda x: x.split("_")[-1])
+
+    # Create a new 'scanner' column combining information
+    scan_df["scanner"] = (
+        scan_df["Manufacturer"] + "_" + scan_df["ManufacturersModelName"]
+    )
+
+    # Select necessary columns
+    scan_df = scan_df[["participant_id", "ses", "scanner"]].copy()
+
+    # Step 3: Merge with qc_df_filtered on 'participant_id' and 'ses'
+    merged_df = pd.merge(
+        qc_df_filtered, scan_df, on=["participant_id", "ses"], how="left"
+    )
+
+    return merged_df
+
+
+def merge_qc_pheno(qc_df_filtered, pheno_df):
     # Create a numeric version of the "days from entry" session
-    pheno_df["ses_numeric"] = pheno_df["ses"].str.replace("d", "").astype(int)
     qc_df_filtered["ses_numeric"] = (
         qc_df_filtered["ses"].str.replace("d", "").astype(int)
     )
+    pheno_df["ses_numeric"] = pheno_df["ses"].str.replace("d", "").astype(int)
 
+    # Ensure sorted by session
     pheno_df = pheno_df.sort_values(by="ses_numeric")
     qc_df_filtered = qc_df_filtered.sort_values(by="ses_numeric")
 
@@ -237,12 +259,14 @@ def process_data(root_p, metadata):
     )
     demo_file_p = root_p / "wrangling-phenotype/data/oasis3/OASIS3_demographics.csv"
     qc_file_p = root_p / "qc_output/rest_df.tsv"
+    scan_p = root_p / "wrangling-phenotype/data/oasis3/OASIS3_MR_json.csv"
     output_p = root_p / "wrangling-phenotype/outputs"
 
     # Load the CSVs
     diagnosis_df = pd.read_csv(diagnosis_file_p)
     demo_df = pd.read_csv(demo_file_p)
     qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+    scan_df = pd.read_csv(scan_p)
 
     # Merge demographics data into diagnosis data
     demo_df = demo_df.drop_duplicates(subset="OASISID", keep="first")
@@ -254,15 +278,20 @@ def process_data(root_p, metadata):
     # Create pheno df
     pheno_df = process_pheno(df)
 
-    # Merge pheno with qc
+    # Filter qc df for dataset
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "oasis3"].copy()
-    qc_pheno_df = merge_oasis3(qc_df_filtered, pheno_df)
+
+    # Merge with scan info
+    qc_scan_df = merge_scanner(qc_df_filtered, scan_df)
+
+    # Merge pheno with qc
+    qc_pheno_df = merge_qc_pheno(qc_scan_df, pheno_df)
 
     # Apply threshold for time between scan and phenotyping. The threshold can be changed in the function
-    filtered_df = apply_threshold(qc_pheno_df)
+    threshold_df = apply_threshold(qc_pheno_df)
 
     # Optionally, drop any scans where the subject has no diagnosis
-    final_df = filtered_df.dropna(subset=["diagnosis"]).copy()
+    final_df = threshold_df.dropna(subset=["diagnosis"]).copy()
 
     # Output tsv file
     final_df.to_csv(output_p / "oasis3_qc_pheno.tsv", sep="\t", index=False)
