@@ -105,14 +105,17 @@ if __name__ == "__main__":
 
     # Set paths
     npi_p = root_p / "data/oasis3/OASIS3_UDSb5_npiq.csv"
-    qc_pheno_p = root_p / "outputs/oasis3_qc_pheno.tsv"
-    output_p = root_p / "outputs/final_oasis.tsv"
+    qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
+    output_p = root_p / "outputs/final_oasis3.tsv"
 
     # Load CSVs
     npi_df = pd.read_csv(npi_p)
     qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t")
 
-    # convert NPI to MBI and calculate total score
+    # Filter for dataset
+    qc_pheno_df = qc_pheno_df[qc_pheno_df["dataset"] == "oasis3"]
+
+    # Convert NPI to MBI and calculate total score
     mbi_df = oasis_npi_to_mbi(npi_df)
     mbi_df = util.calculate_mbi_score(mbi_df)
     mbi_df = select_columns(mbi_df)

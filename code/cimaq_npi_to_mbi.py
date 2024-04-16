@@ -109,12 +109,15 @@ if __name__ == "__main__":
 
     # Set paths
     npi_p = root_p / "data/cimaq/22901_inventaire_neuropsychiatrique_q.tsv"
-    qc_pheno_p = root_p / "outputs/cimaq_qc_pheno.tsv"
+    qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
     output_p = root_p / "outputs/final_cimaq.tsv"
 
     # Load CSVs
     npi_df = pd.read_csv(npi_p, sep="\t")
     qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t")
+
+    # Filter for dataset
+    qc_pheno_df = qc_pheno_df[qc_pheno_df["dataset"] == "cimaq"]
 
     # Convert NPI to MBI and calculate total score
     npi_df = map_values(npi_df)

@@ -78,14 +78,17 @@ if __name__ == "__main__":
 
     # Set paths
     npi_p = root_p / "data/adni/NPI_22Aug2023.csv"
-    qc_pheno_p = root_p / "outputs/adni_qc_pheno.tsv"
+    qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
     output_p = root_p / "outputs/final_adni.tsv"
 
-    # load data
+    # Load data
     npi_df = pd.read_csv(npi_p)
     qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t")
 
-    # convert NPI to MBI and calculate total score
+    # Filter for dataset
+    qc_pheno_df = qc_pheno_df[qc_pheno_df["dataset"] == "adni"]
+
+    # Convert NPI to MBI and calculate total score
     mbi_df = adni_npi_to_mbi(npi_df)
     mbi_df = util.calculate_mbi_score(mbi_df)
     mbi_df = select_columns(mbi_df)
