@@ -179,27 +179,6 @@ def process_pheno(df):
     return df.copy()
 
 
-def merge_scanner(qc_df_filtered, scan_df):
-    # Create 'participant_id' and 'ses' columns in the oasis scan info for merging
-    scan_df["participant_id"] = scan_df["label"].apply(lambda x: x.split("_")[0])
-    scan_df["ses"] = scan_df["label"].apply(lambda x: x.split("_")[-1])
-
-    # Create scanner column
-    scan_df["scanner"] = (
-        scan_df["Manufacturer"] + "_" + scan_df["ManufacturersModelName"]
-    ).str.lower()
-
-    # Step 3: Merge with qc_df_filtered on 'participant_id' and 'ses'
-    merged_df = pd.merge(
-        qc_df_filtered,
-        scan_df[["participant_id", "ses", "scanner"]],
-        on=["participant_id", "ses"],
-        how="left",
-    )
-
-    return merged_df
-
-
 def merge_qc_pheno(qc_df_filtered, pheno_df):
     # Create a numeric version of the "days from entry" session
     qc_df_filtered["ses_numeric"] = (
@@ -233,6 +212,29 @@ def merge_qc_pheno(qc_df_filtered, pheno_df):
     merged_df.rename(columns={"ses_x": "ses"}, inplace=True)
     merged_df.drop(columns=["ses_scan"], inplace=True)
     merged_df.drop(columns=["ses_pheno"], inplace=True)
+
+    return merged_df
+
+
+def merge_scanner(qc_pheno_df, scan_df):
+    # Create 'participant_id' and 'ses' columns in the oasis scan info for merging
+    scan_df["participant_id"] = scan_df["label"].apply(lambda x: x.split("_")[0])
+    scan_df["ses"] = scan_df["label"].apply(lambda x: x.split("_")[-1])
+
+    # Create scanner column
+    scan_df["scanner"] = (
+        scan_df["Manufacturer"] + "_" + scan_df["ManufacturersModelName"]
+    ).str.lower()
+
+    # Step 3: Merge with qc_df_filtered on 'participant_id' and 'ses'
+    merged_df = pd.merge(
+        qc_pheno_df,
+        scan_df[["participant_id", "ses", "scanner"]],
+        on=["participant_id", "ses"],
+        how="left",
+    )
+
+    merged_df["site_scanner"] = merged_df["site"] + "_" + merged_df["scanner"]
 
     return merged_df
 
@@ -281,14 +283,14 @@ def process_data(root_p, metadata):
     # Filter qc df for dataset
     qc_df_filtered = qc_df.loc[qc_df["dataset"] == "oasis3"].copy()
 
-    # Merge with scan info
-    qc_scan_df = merge_scanner(qc_df_filtered, scan_df)
-
     # Merge pheno with qc
-    qc_pheno_df = merge_qc_pheno(qc_scan_df, pheno_df)
+    qc_pheno_df = merge_qc_pheno(qc_df_filtered, pheno_df)
+
+    # Merge with scan info
+    qc_scan_df = merge_scanner(qc_pheno_df, scan_df)
 
     # Apply threshold for time between scan and phenotyping. The threshold can be changed in the function
-    threshold_df = apply_threshold(qc_pheno_df)
+    threshold_df = apply_threshold(qc_scan_df)
 
     # Optionally, drop any scans where the subject has no diagnosis
     final_df = threshold_df.dropna(subset=["diagnosis"]).copy()
