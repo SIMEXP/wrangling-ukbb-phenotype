@@ -76,6 +76,24 @@ metadata = {
 }
 
 
+def process_scanner(mri_df, df):
+    # Match protocol numbers and return the scanner name
+    mri_df = mri_df.transpose()
+
+    mri_df.columns = mri_df.iloc[0]
+    mri_df = mri_df[1:]
+
+    mri_df.index = mri_df.index.astype(int)
+    df["protocol"] = df["protocol"].astype(int)
+
+    df["scanner"] = df["protocol"].map(mri_df["MRI Scanner"])
+    df["scanner"] = df["scanner"].str.lower().str.replace(" ", "_")
+    # Create variable of site and scanner
+    df["site_scanner"] = (df["site"] + "_" + df["scanner"]).str.lower()
+
+    return df
+
+
 def process_pheno(df):
     # Remove sub- from participant id
     df["participant_id"] = df["participant_id"].str.replace("sub-", "", regex=False)
@@ -100,7 +118,18 @@ def process_pheno(df):
     df["handedness"] = df["hand"].map({1: "right", 2: "left", 0: "ambidextrous"})
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis", "handedness"]]
+    df = df[
+        [
+            "participant_id",
+            "age",
+            "sex",
+            "site",
+            "diagnosis",
+            "handedness",
+            "scanner",
+            "site_scanner",
+        ]
+    ]
 
     return df
 
@@ -119,11 +148,16 @@ def process_data(root_p, metadata):
     # Paths to data
     file_p = root_p / "wrangling-phenotype/data/srpbs/participants.tsv"
     qc_file_p = root_p / "qc_output/rest_df.tsv"
+    mri_protocol_p = root_p / "wrangling-phenotype/data/srpbs/MRI_protocols_rsMRI.tsv"
     output_p = root_p / "wrangling-phenotype/outputs"
 
     # Load the CSV
     df = pd.read_csv(file_p, sep="\t")
+    mri_df = pd.read_csv(mri_protocol_p, sep="\t", header=1)
     qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+
+    # Get the scanner information
+    df = process_scanner(mri_df, df)
 
     # Process pheno df
     pheno_df = process_pheno(df)
