@@ -60,13 +60,26 @@ def process_pheno(df):
     df["age"] = df["Current Age"].astype(float)
     df["sex"] = df["Gender"].map({"Female": "female", "Male": "male"})
     df["site"] = "cobre"  # There is only one site, and no name provided
+    df["scanner"] = "siemens_triotim"  # Given in COBRE_parameters_mprage.csv
+    df["site_scanner"] = df["site"] + "_" + df["scanner"]
     df["diagnosis"] = df["Subject Type"].map({"Control": "CON", "Patient": "SCHZ"})
     df["handedness"] = df["Handedness"].map(
         {"Right": "right", "Left": "left", "Both": "ambidextrous"}
     )
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis", "handedness"]]
+    df = df[
+        [
+            "participant_id",
+            "age",
+            "sex",
+            "site",
+            "diagnosis",
+            "handedness",
+            "scanner",
+            "site_scanner",
+        ]
+    ]
     return df
 
 
