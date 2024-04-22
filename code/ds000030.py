@@ -56,12 +56,18 @@ def process_pheno(df):
     df["age"] = df["age"].astype(float)
     df["sex"] = df["gender"].map({"F": "female", "M": "male"})
     df["site"] = "ds000030"  # There is only one site, and no name provided
+    df["scanner"] = (
+        "siemens_trio"  # Given in https://doi.org/10.12688/f1000research.11964.2
+    )
+    df["site_scanner"] = df["site"] + "_" + df["scanner"]
     df["diagnosis"] = df["diagnosis"].map(
         {"CONTROL": "CON", "SCHZ": "SCHZ", "BIPOLAR": "BIPOLAR", "ADHD": "ADHD"}
     )
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
+    df = df[
+        ["participant_id", "age", "sex", "site", "diagnosis", "scanner", "site_scanner"]
+    ]
     return df
 
 
