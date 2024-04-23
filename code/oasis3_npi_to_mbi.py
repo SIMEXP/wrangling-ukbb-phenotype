@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
     # Load CSVs
     npi_df = pd.read_csv(npi_p)
-    qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t")
+    qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t", low_memory=False)
 
     # Filter for dataset
     qc_pheno_df = qc_pheno_df[qc_pheno_df["dataset"] == "oasis3"]
