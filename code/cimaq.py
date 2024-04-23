@@ -75,7 +75,7 @@ def merge_pheno(scan_df, diagnosis_df, socio_df, cog_df):
     scan_df_first = scan_df.drop_duplicates(subset="pscid", keep="first")
     df = pd.merge(
         df,
-        scan_df_first[["pscid", "centre"]],
+        scan_df_first[["pscid", "site_scanner"]],
         on="pscid",
         how="left",
     )
@@ -107,7 +107,11 @@ def process_pheno(df):
     df["participant_id"] = df["pscid"].astype(str)
     df["age"] = df["âge_du_participant"].astype(float)
     df["sex"] = df["sexe"].map({"femme": "female", "homme": "male"})
-    df["site"] = df["centre"]
+    df["site"] = df["site_scanner"].replace(
+        {
+            "Hopital Général Juif": "JGH",
+        }
+    )
     df["diagnosis"] = df["22501_diagnostic_clinique"].map(
         {
             "démence_de_type_alzheimer-légère": "ADD(M)",
@@ -184,8 +188,8 @@ def merge_scanner(qc_pheno_df, scan_df):
     ).str.lower()
 
     # Drop multiple entries per session for scannning data
-    scan_df = scan_df.sort_values("date").drop_duplicates(
-        subset=["pscid", "session"], keep="first"
+    scan_df = scan_df.sort_values("date_du_scan").drop_duplicates(
+        subset=["pscid", "no_visite"], keep="first"
     )
 
     qc_pheno_df["participant_id"] = qc_pheno_df["participant_id"].astype(int)
@@ -193,9 +197,9 @@ def merge_scanner(qc_pheno_df, scan_df):
 
     merged_df = pd.merge(
         qc_pheno_df,
-        scan_df[["pscid", "session", "scanner"]],
+        scan_df[["pscid", "no_visite", "scanner"]],
         left_on=["participant_id", "ses"],
-        right_on=["pscid", "session"],
+        right_on=["pscid", "no_visite"],
         how="left",
     )
 
@@ -212,7 +216,10 @@ def process_data(root_p, metadata):
     diagnosis_file_p = (
         root_p / "wrangling-phenotype/data/cimaq/22501_diagnostic_clinique.tsv"
     )
-    scan_file_p = root_p / "wrangling-phenotype/data/cimaq/sommaire_des_scans.tsv"
+    scan_file_p = (
+        root_p
+        / "wrangling-phenotype/data/cimaq/dr15_20240301_sommaire_des_scans-nii.tsv"
+    )  # Using the dr15 spreadsheet since there is more data available
     socio_file_p = (
         root_p
         / "wrangling-phenotype/data/cimaq/55398_informations_socio_demographiques_participant_initial.tsv"
