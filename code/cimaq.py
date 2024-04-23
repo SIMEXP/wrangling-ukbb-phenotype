@@ -183,6 +183,11 @@ def merge_scanner(qc_pheno_df, scan_df):
         + scan_df["modele_scanner"].str.replace(" ", "_")
     ).str.lower()
 
+    # Drop multiple entries per session for scannning data
+    scan_df = scan_df.sort_values("date").drop_duplicates(
+        subset=["pscid", "session"], keep="first"
+    )
+
     qc_pheno_df["participant_id"] = qc_pheno_df["participant_id"].astype(int)
     scan_df["pscid"] = scan_df["pscid"].astype(int)
 
