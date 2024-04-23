@@ -40,7 +40,7 @@ metadata = {
     "site": {
         "original_field_name": "SITE",
         "description": "Site of imaging data collection",
-        "levels": "unable to find the matching site names. Acquisition sites can be found here: https://adni.loni.usc.edu/about/centers-cores/study-sites/",
+        "levels": "Corresponding site names are not released. Sites can be found here: https://adni.loni.usc.edu/about/centers-cores/study-sites/",
     },
     "diagnosis": {
         "original_field_name": {
@@ -82,6 +82,22 @@ def calculate_age(adnimerge_df, demo_df):
     return adnimerge_df
 
 
+def extract_scanner_info(protocol_str):
+    # Parse scanner info
+    parts = protocol_str.split(";")
+
+    info_dict = {}
+    for part in parts:
+        if "=" in part:
+            key, value = part.split("=", 1)
+            info_dict[key.strip()] = value.strip()
+
+    # Extract info, join and convert to lowercase
+    manufacturer = info_dict.get("Manufacturer", "")
+    model = info_dict.get("Mfg Model", "")
+    return "_".join([manufacturer, model]).replace(" ", "_").lower()
+
+
 def process_pheno(adnimerge_df, adni_df):
     # In adnimerge Diagnosis == DX. These do not include screening diagnoses, so if it's missing we get the nearest one from adni_spreadsheet.csv:
     adnimerge_df.rename(
@@ -92,8 +108,12 @@ def process_pheno(adnimerge_df, adni_df):
         columns={"Subject ID": "participant_id", "Study Date": "ses"}, inplace=True
     )
 
+    # Parse scanner info
+    adni_df["Imaging Protocol_mri"] = adni_df["Imaging Protocol_mri"].astype(str)
+    adni_df["scanner"] = adni_df["Imaging Protocol_mri"].apply(extract_scanner_info)
+
     # Select only needed columns
-    adni_df = adni_df[["participant_id", "ses", "Research Group"]].copy()
+    adni_df = adni_df[["participant_id", "ses", "Research Group", "scanner"]].copy()
 
     # Convert sessions to datetime
     adnimerge_df["ses"] = pd.to_datetime(adnimerge_df["ses"])
@@ -135,6 +155,7 @@ def process_pheno(adnimerge_df, adni_df):
     df["participant_id"] = df["participant_id"].str.replace(
         "_", "", regex=False
     )  # So it matches the id in MRI file names
+    df["site_scanner"] = df["site"] + "_" + df["scanner"]
 
     # Select columns
     df = df[
@@ -146,6 +167,8 @@ def process_pheno(adnimerge_df, adni_df):
             "diagnosis",
             "education",
             "ses",
+            "scanner",
+            "site_scanner",
         ]
     ]
     return df
