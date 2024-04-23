@@ -221,6 +221,11 @@ def merge_scanner(qc_pheno_df, scan_df):
     scan_df["participant_id"] = scan_df["label"].apply(lambda x: x.split("_")[0])
     scan_df["ses"] = scan_df["label"].apply(lambda x: x.split("_")[-1])
 
+    # Drop multiple entries per session for scannning data
+    scan_df.drop_duplicates(
+        subset=["participant_id", "ses"], keep="first", inplace=True
+    )
+
     # Create scanner column
     scan_df["scanner"] = (
         scan_df["Manufacturer"] + "_" + scan_df["ManufacturersModelName"]
