@@ -96,6 +96,8 @@ def adni_merge_mbi_qc(qc_pheno_df, mbi_df):
         tolerance=pd.Timedelta(days=183),
     )
 
+    merged_df = merged_df.drop("RID", axis=1)
+
     return merged_df
 
 

@@ -103,6 +103,17 @@ if __name__ == "__main__":
     final_cimaq = process_cimaq_mbi(qc_pheno_df)
     final_oasis3 = process_oasis3_mbi(qc_pheno_df)
 
+    # Remove existing data for specific datasets from qc_pheno_df
+    remaining_qc_pheno_df = qc_pheno_df[
+        ~qc_pheno_df["dataset"].isin(["adni", "cimaq", "oasis3"])
+    ]
+
+    # Concatenate the remaining with the new processed mbi data
+    updated_qc_pheno_df = pd.concat(
+        [remaining_qc_pheno_df, final_adni, final_cimaq, final_oasis3],
+        ignore_index=True,
+    )
+
     # Output df
-    output_p = root_p / "outputs/final_oasis3.tsv"
-    final_oasis3.to_csv(output_p, sep="\t", index=False)
+    output_p = root_p / "outputs/final_master_pheno.tsv"
+    updated_qc_pheno_df.to_csv(output_p, sep="\t", index=False)
