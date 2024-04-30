@@ -88,8 +88,6 @@ def process_scanner(mri_df, df):
 
     df["scanner"] = df["protocol"].map(mri_df["MRI Scanner"])
     df["scanner"] = df["scanner"].str.lower().str.replace(" ", "_")
-    # Create variable of site and scanner
-    df["site_scanner"] = (df["site"] + "_" + df["scanner"]).str.lower()
 
     return df
 
@@ -127,7 +125,6 @@ def process_pheno(df):
             "diagnosis",
             "handedness",
             "scanner",
-            "site_scanner",
         ]
     ]
 
