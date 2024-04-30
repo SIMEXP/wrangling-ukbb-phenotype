@@ -155,7 +155,6 @@ def process_pheno(adnimerge_df, adni_df):
     df["participant_id"] = df["participant_id"].str.replace(
         "_", "", regex=False
     )  # So it matches the id in MRI file names
-    df["site_scanner"] = df["site"] + "_" + df["scanner"]
 
     # Select columns
     df = df[
@@ -168,7 +167,6 @@ def process_pheno(adnimerge_df, adni_df):
             "education",
             "ses",
             "scanner",
-            "site_scanner",
         ]
     ]
     return df
