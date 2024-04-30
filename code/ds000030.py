@@ -59,15 +59,12 @@ def process_pheno(df):
     df["scanner"] = (
         "siemens_trio"  # Given in https://doi.org/10.12688/f1000research.11964.2
     )
-    df["site_scanner"] = df["site"] + "_" + df["scanner"]
     df["diagnosis"] = df["diagnosis"].map(
         {"CONTROL": "CON", "SCHZ": "SCHZ", "BIPOLAR": "BIPOLAR", "ADHD": "ADHD"}
     )
 
     # Select columns
-    df = df[
-        ["participant_id", "age", "sex", "site", "diagnosis", "scanner", "site_scanner"]
-    ]
+    df = df[["participant_id", "age", "sex", "site", "diagnosis", "scanner"]]
     return df
 
 
