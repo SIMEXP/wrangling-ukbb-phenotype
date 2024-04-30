@@ -239,8 +239,6 @@ def merge_scanner(qc_pheno_df, scan_df):
         how="left",
     )
 
-    merged_df["site_scanner"] = merged_df["site"] + "_" + merged_df["scanner"]
-
     return merged_df
 
 
