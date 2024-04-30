@@ -63,11 +63,8 @@ def process_pheno(df):
         }
     )
     df["scanner"] = (
-        "siemens_magnetom_prisma"  # Specified in HCP-EP_Release_1.1_Manual.pdf (+ correspondence with study team)
+        "siemens_magnetom_prisma"  # Specified in HCP-EP_Release_1.1_Manual.pdf (+ correspondence with study team. articipants were scanned at one of two sites, not necessarily their site, but this data is not released so I think this is the best we can do)
     )
-    df["site_scanner"] = (
-        df["site"] + "_" + df["scanner"]
-    ).str.lower()  # Participants were scanned at one of two sites, not necessarily their site, but this data is not released so I think this is the best we can do
     df["diagnosis"] = df["phenotype"].map({"Control": "CON", "Patient": "PSYC"})
 
     # Select columns
@@ -79,7 +76,6 @@ def process_pheno(df):
             "site",
             "diagnosis",
             "scanner",
-            "site_scanner",
         ]
     ]
     return df
