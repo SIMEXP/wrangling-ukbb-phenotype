@@ -26,7 +26,6 @@ def create_master_df(root_p, datasets):
         "diagnosis",
         "dataset",
         "scanner",
-        "site_scanner",
         "mean_fd_raw",
         "mean_fd_scrubbed",
         "proportion_kept",
