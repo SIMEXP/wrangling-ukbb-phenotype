@@ -85,6 +85,76 @@ def process_oasis3_mbi(qc_pheno_df):
     return final_oasis3
 
 
+def assign_mbi_group(row):
+    if row["diagnosis"] in ["ADD", "ADD(M)"]:
+        if row["mbi_status"] == 1:
+            return "ADD+"
+        elif row["mbi_status"] == 0:
+            return "ADD-"
+    elif row["diagnosis"] in ["MCI", "EMCI", "LMCI"]:
+        if row["mbi_status"] == 1:
+            return "MCI+"
+        elif row["mbi_status"] == 0:
+            return "MCI-"
+    elif row["diagnosis"] == "CON":
+        return "CON-AD"
+
+
+def assign_sz_group(row):
+    if row["diagnosis"] in ["SCHZ"]:
+        return "SCHZ"
+    elif row["diagnosis"] == "CON":
+        return "CON-SCHZ"
+
+
+def create_final_ad_df(qc_pheno_df):
+    # Process mbi scores for specific datasets
+    final_adni = process_adni_mbi(qc_pheno_df)
+    final_cimaq = process_cimaq_mbi(qc_pheno_df)
+    final_oasis3 = process_oasis3_mbi(qc_pheno_df)
+
+    # Concatenate these Alzheimer datasets
+    ad_datasets_df = pd.concat(
+        [final_adni, final_cimaq, final_oasis3],
+        ignore_index=True,
+    )
+
+    # Assign group based on diagnosis and MBI status
+    ad_datasets_df["group"] = ad_datasets_df.apply(assign_mbi_group, axis=1)
+
+    # Save Alzheimer datasets with MBI data for further analysis
+    ad_datasets_df.to_csv(root_p / "outputs/ad_datasets_df.tsv", sep="\t", index=False)
+
+    # Drop MBI columns, not needed for further analysis
+    ad_datasets_df = ad_datasets_df.drop(
+        [
+            "decreased_motivation",
+            "emotional_dysregulation",
+            "impulse_dyscontrol",
+            "social_inappropriateness",
+            "abnormal_perception",
+            "mbi_total_score",
+            "mbi_status",
+        ],
+        axis=1,
+    )
+
+    return ad_datasets_df
+
+
+def create_final_sz_df(qc_pheno_df):
+    # Select schizophrenia datasets from qc_pheno
+    sz_datasets_df = qc_pheno_df[
+        qc_pheno_df["dataset"].isin(["hcpep", "cobre", "srpbs", "ds000030"])
+    ].copy()
+
+    # Re-code diagnosis and assign group
+    sz_datasets_df["diagnosis"] = sz_datasets_df["diagnosis"].replace("PSYC", "SCHZ")
+    sz_datasets_df["group"] = sz_datasets_df.apply(assign_sz_group, axis=1)
+
+    return sz_datasets_df
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Convert NPI to MBI, merge with QC and pheno data for ADNI, CIMA-Q and OASIS3"
@@ -98,22 +168,16 @@ if __name__ == "__main__":
     qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
     qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t", low_memory=False)
 
-    # Process mbi scores for specific datasets
-    final_adni = process_adni_mbi(qc_pheno_df)
-    final_cimaq = process_cimaq_mbi(qc_pheno_df)
-    final_oasis3 = process_oasis3_mbi(qc_pheno_df)
+    # Create dfs for different diagnosis datasets
+    ad_datasets_df = create_final_ad_df(qc_pheno_df)
+    sz_datasets_df = create_final_sz_df(qc_pheno_df)
 
-    # Remove existing data for specific datasets from qc_pheno_df
-    remaining_qc_pheno_df = qc_pheno_df[
-        ~qc_pheno_df["dataset"].isin(["adni", "cimaq", "oasis3"])
-    ]
-
-    # Concatenate the remaining with the new processed mbi data
-    updated_qc_pheno_df = pd.concat(
-        [remaining_qc_pheno_df, final_adni, final_cimaq, final_oasis3],
+    # Concatenate the two sets of datasets
+    final_qc_pheno_df = pd.concat(
+        [ad_datasets_df, sz_datasets_df],
         ignore_index=True,
     )
 
-    # Output df
-    output_p = root_p / "outputs/final_master_pheno.tsv"
-    updated_qc_pheno_df.to_csv(output_p, sep="\t", index=False)
+    # Save Alzheimer datasets
+    output_p = root_p / "outputs/final_qc_pheno.tsv"
+    final_qc_pheno_df.to_csv(output_p, sep="\t", index=False)
