@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import argparse
 import util
 
 from pathlib import Path
@@ -86,12 +85,12 @@ def process_oasis3_mbi(qc_pheno_df):
 
 
 def assign_mbi_group(row):
-    if row["diagnosis"] in ["ADD", "ADD(M)"]:
+    if row["diagnosis"] in ["ADD"]:
         if row["mbi_status"] == 1:
             return "ADD+"
         elif row["mbi_status"] == 0:
             return "ADD-"
-    elif row["diagnosis"] in ["MCI", "EMCI", "LMCI"]:
+    elif row["diagnosis"] in ["MCI"]:
         if row["mbi_status"] == 1:
             return "MCI+"
         elif row["mbi_status"] == 0:
@@ -119,11 +118,17 @@ def create_final_ad_df(qc_pheno_df):
         ignore_index=True,
     )
 
-    # Assign group based on diagnosis and MBI status
+    # Re-code diagnoses and assign groups. For this study we are not looking at MCI/ADD subtypes
+    ad_datasets_df["diagnosis"] = ad_datasets_df["diagnosis"].replace(
+        {"ADD(M)": "ADD", "EMCI": "MCI", "LMCI": "MCI"}
+    )
     ad_datasets_df["group"] = ad_datasets_df.apply(assign_mbi_group, axis=1)
 
-    # Save Alzheimer datasets with MBI data for further analysis
-    ad_datasets_df.to_csv(root_p / "outputs/ad_datasets_df.tsv", sep="\t", index=False)
+    # Save Alzheimer datasets with MBI data
+    out_p = root_p / "outputs/ad_datasets_mbi_df.tsv"
+    ad_datasets_df.to_csv(out_p, sep="\t", index=False)
+
+    print(f"Saved ad_datasets_df to {out_p}")
 
     # Drop MBI columns, not needed for further analysis
     ad_datasets_df = ad_datasets_df.drop(
@@ -148,7 +153,7 @@ def create_final_sz_df(qc_pheno_df):
         qc_pheno_df["dataset"].isin(["hcpep", "cobre", "srpbs", "ds000030"])
     ].copy()
 
-    # Re-code diagnosis and assign group
+    # Re-code diagnosis and assign groups
     sz_datasets_df["diagnosis"] = sz_datasets_df["diagnosis"].replace("PSYC", "SCHZ")
     sz_datasets_df["group"] = sz_datasets_df.apply(assign_sz_group, axis=1)
 
@@ -156,13 +161,7 @@ def create_final_sz_df(qc_pheno_df):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Convert NPI to MBI, merge with QC and pheno data for ADNI, CIMA-Q and OASIS3"
-    )
-    parser.add_argument("rootpath", type=Path, help="Root path")
-
-    args = parser.parse_args()
-    root_p = args.rootpath
+    root_p = Path("/home/neuromod/wrangling-phenotype")
 
     # Load passed_qc_master once
     qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
@@ -178,6 +177,8 @@ if __name__ == "__main__":
         ignore_index=True,
     )
 
-    # Save Alzheimer datasets
-    output_p = root_p / "outputs/final_qc_pheno.tsv"
-    final_qc_pheno_df.to_csv(output_p, sep="\t", index=False)
+    # Save output
+    out_p = root_p / "outputs/final_qc_pheno.tsv"
+    final_qc_pheno_df.to_csv(out_p, sep="\t", index=False)
+
+    print(f"Saved final_qc_pheno_df to {out_p}")
