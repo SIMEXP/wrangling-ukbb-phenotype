@@ -160,16 +160,6 @@ def create_final_sz_df(qc_pheno_df):
     return sz_datasets_df
 
 
-def remove_single_site(df, site_column="site"):
-    # Count the occurrences of each site
-    site_counts = df[site_column].value_counts()
-    # Identify sites with more than one participant
-    sites_to_keep = site_counts[site_counts > 1].index
-    # Filter the df
-    filtered_df = df[df[site_column].isin(sites_to_keep)].copy()
-    return filtered_df
-
-
 if __name__ == "__main__":
     root_p = Path("/home/neuromod/wrangling-phenotype")
 
@@ -187,11 +177,8 @@ if __name__ == "__main__":
         ignore_index=True,
     )
 
-    # Remove sites with only a single participant (cannot harmonize)
-    final_qc_pheno_df = remove_single_site(concat_qc_pheno_df, site_column="site")
-
     # Save output
     out_p = root_p / "outputs/final_qc_pheno.tsv"
-    final_qc_pheno_df.to_csv(out_p, sep="\t", index=False)
+    concat_qc_pheno_df.to_csv(out_p, sep="\t", index=False)
 
     print(f"Saved final_qc_pheno_df to {out_p}")
