@@ -96,7 +96,7 @@ def assign_mbi_group(row):
         elif row["mbi_status"] == 0:
             return "MCI-"
     elif row["diagnosis"] == "CON":
-        return "CON-AD"
+        return "CON-ADD"
 
 
 def assign_sz_group(row):
