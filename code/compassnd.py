@@ -12,7 +12,6 @@ The data data-2024-03-05T19_55_47.299Z.csv is downloaded from https://ccna.loris
 import pandas as pd
 import numpy as np
 import json
-import argparse
 from pathlib import Path
 
 # Define metadata
@@ -33,7 +32,7 @@ metadata = {
     "site": {
         "original_field_name": "Initial_MRI mri_parameter_form,006_site",
         "description": "Site of imaging data collection",
-        "levels": {"unable to find the corresponding site names currently"},
+        "levels": ["unable to find the corresponding site names"],
     },
     "diagnosis": {
         "original_field_name": "",
@@ -48,15 +47,25 @@ metadata = {
 }
 
 
-def process_data(root_p, output_p, metadata):
-    # Input file path
-    data_p = root_p / "data-2024-03-05T20_52_17.741Z.csv"
-    diagnosis_df = root_p / "data-2024-03-05T21_09_05.690Z.csv"
+def process_data(metadata):
+    # Set paths
+    root_p = Path("/home/neuromod")
+    data_p = (
+        root_p / "wrangling-phenotype/data/compassnd/data-2024-03-05T20_52_17.741Z.csv"
+    )
+    diagnosis_p = (
+        root_p / "wrangling-phenotype/data/compassnd/data-2024-03-05T21_09_05.690Z.csv"
+    )
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
+    output_p = root_p / "wrangling-phenotype/outputs"
 
-    # Load the CSV
+    # Load the data
     df = pd.read_csv(data_p)
+    diagnosis_df = pd.read_csv(diagnosis_p)
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
     df.replace(".", np.nan, inplace=True)
+    diagnosis_df.replace(".", np.nan, inplace=True)
 
     # Process the data
     df["participant_id"] = df["Identifiers"].astype(str)
@@ -80,13 +89,40 @@ def process_data(root_p, output_p, metadata):
         "Initial_Assessment_Screening Screening_Education,010_total_years_of_schooling"
     ].astype(float)
 
+    # Merge the diagnosis data
+    df = df.merge(
+        diagnosis_df[
+            [
+                "Identifiers",
+                "Initial_Diagnosis_Reappraisal Reappraisal_Initial_Diagnosis_Reappraisal,008_primary_diagnosis_categories",
+            ]
+        ],
+        left_on="Identifiers",
+        right_on="Identifiers",
+        how="left",
+    )
+
+    # Replace string in diagnosis col
+    df["diagnosis"] = df[
+        "Initial_Diagnosis_Reappraisal Reappraisal_Initial_Diagnosis_Reappraisal,008_primary_diagnosis_categories"
+    ].str.replace("{@}", "_", regex=False)
+
     # Select columns
-    df = df[
-        ["participant_id", "age", "sex", "site", "handedness", "education"]
-    ]  # Diagnosis to be added
+    pheno_df = df[
+        ["participant_id", "age", "sex", "site", "handedness", "education", "diagnosis"]
+    ]
+
+    # Merge with QC
+    # Filter to rows for adni
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "compassnd"].copy()
+    merged_df = pheno_df.merge(qc_df_filtered, on="participant_id", how="right")
+
+    # Handle site columns
+    merged_df.drop(columns=["site_y"], inplace=True)
+    merged_df.rename(columns={"site_x": "site"}, inplace=True)
 
     # Output tsv file
-    df.to_csv(output_p / "compassnd_pheno.tsv", sep="\t", index=False)
+    merged_df.to_csv(output_p / "compassnd_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "compassnd_pheno.json", "w") as f:
@@ -96,12 +132,4 @@ def process_data(root_p, output_p, metadata):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Process COMPASS-ND phenotype data and output to to TSV and JSON"
-    )
-    parser.add_argument("rootpath", type=Path, help="Root path to the data files")
-    parser.add_argument("output", type=Path, help="Path to the output directory")
-
-    args = parser.parse_args()
-
-    process_data(args.rootpath, args.output, metadata)
+    process_data(metadata)
