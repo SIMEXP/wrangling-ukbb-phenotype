@@ -56,13 +56,11 @@ def process_data(metadata):
     diagnosis_p = (
         root_p / "wrangling-phenotype/data/compassnd/data-2024-03-05T21_09_05.690Z.csv"
     )
-    qc_file_p = root_p / "qc_output/rest_df.tsv"
     output_p = root_p / "wrangling-phenotype/outputs"
 
     # Load the data
     df = pd.read_csv(data_p)
     diagnosis_df = pd.read_csv(diagnosis_p)
-    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
     df.replace(".", np.nan, inplace=True)
     diagnosis_df.replace(".", np.nan, inplace=True)
@@ -112,17 +110,8 @@ def process_data(metadata):
         ["participant_id", "age", "sex", "site", "handedness", "education", "diagnosis"]
     ]
 
-    # Merge with QC
-    # Filter to rows for adni
-    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "compassnd"].copy()
-    merged_df = pheno_df.merge(qc_df_filtered, on="participant_id", how="right")
-
-    # Handle site columns
-    merged_df.drop(columns=["site_y"], inplace=True)
-    merged_df.rename(columns={"site_x": "site"}, inplace=True)
-
     # Output tsv file
-    merged_df.to_csv(output_p / "compassnd_qc_pheno.tsv", sep="\t", index=False)
+    pheno_df.to_csv(output_p / "compassnd_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "compassnd_pheno.json", "w") as f:
