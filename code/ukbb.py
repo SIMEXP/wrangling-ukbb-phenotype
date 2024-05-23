@@ -7,6 +7,9 @@ included in the repository.
 
 Labels are cureated from the ukbb website and saved to `data/ukbb`.
 This is public information hence it is not included in the repository.
+You will need to download coding9, coding10, and coding19.
+For example, coding9 can be downloaded from:
+https://biobank.ndph.ox.ac.uk/ukb/coding.cgi?id=9
 
 data_file is provided by SJ's lab and requires DUA,
 hence it is not included in the repository.
@@ -45,8 +48,98 @@ info = {
                 'description': 'first repeat imaging visit',
             }
         }
+    },
+    'diagnosis':{
+        'id': 41270,
+        'description': 'Diagnoses - International Classification of Disease version 10 (ICD10)',
+        'labels': 'coding19.tsv',  # download from ukbb website
+        'instance':{
+            'F00': {
+                'label': 'ADD',
+                'description': 'Alzheimer disease - Dementia',
+            },
+            'F10': {
+                'label': 'ALCO',
+                'description': 'Alcohol Abuse',
+            },
+            'F20': {
+                'label': 'SCZ',
+                'description': 'Schizophrenia',
+            },
+            'F31': {
+                'label': 'BIPOLAR',
+                'description': 'Bipolar disorder',
+            },
+            'F32': {
+                'label': 'DEP',
+                'description': 'Depressive disorder',
+            },
+            'G20': {
+                'label': 'PARK',
+                'description': 'Parkinson',
+            },
+            'G30': {
+                'label': 'ADD',
+                'description': 'Alzheimer disease - Dementia',
+            },
+            'G35': {
+                'label': 'MS',
+                'description': 'Multiple sclerosis',
+            },
+            'G40': {
+                'label': 'EPIL',
+                'description': 'Epilepsy',
+            },
+        }
     }
 }
+
+
+def read_ukbb_diagnosis(data_file):
+    # read data_file with subject id and all columns started with f.41270
+    data = pd.read_csv(data_file, sep='\t', na_values='NA', index_col=0, low_memory=False)
+    data = data.filter(regex='^f.41270', axis=1)
+    for idx, row in data.iterrows():
+        row = row.dropna()
+        # reduce the value to the first three characters
+        row = row.apply(lambda x: x[:3])
+        row = row.tolist()
+        if len(row) > 0:
+            # assign as the default as control
+            data.loc[idx, 'icd10'] = row[0]
+            data.loc[idx, 'n_icd10'] = len(row)
+            data.loc[idx, 'diagnosis'] = 'CON'
+            # take the first value that matches diagnosis of interest
+            while row:
+                label = row.pop(0)
+                if label in info['diagnosis']['instance']:
+                    data.loc[idx, 'diagnosis'] = info['diagnosis']['instance'][label]['label']
+                    data.loc[idx, 'icd10'] = label
+                    break
+        else:
+            # no history of diagnosis at all wow
+            data.loc[idx, 'n_icd10'] = 0
+            data.loc[idx, 'icd10'] = None
+            data.loc[idx, 'diagnosis'] = 'HC'
+                
+    meta_data = {
+        'diagnosis': {
+            'fid': 'f.41270.x',
+            'description': info['diagnosis']['description'],
+            'labels': {  # curated from ukbb website
+                'ADD': 'Alzheimer disease - Dementia',
+                'ALCO': 'Alcohol Abuse',
+                'SCZ': 'Schizophrenia',
+                'BIPOLAR': 'Bipolar disorder',
+                'PARK': 'Parkinson',
+                'MS': 'Multiple sclerosis',
+                'EPIL': 'Epilepsy',
+                'CON': 'Control',
+                'HC': 'Healthy control',
+            }
+        }
+    }
+    return data[['diagnosis', 'icd10', 'n_icd10']], meta_data
 
 
 def read_ukbb_data(data_file, info_label):
@@ -56,6 +149,10 @@ def read_ukbb_data(data_file, info_label):
             f'Unsupported data for extraction: {info_label}. Available data: '
             f'{list(info.keys())}'
         )
+
+    # diagnostic data has to be handled differently
+    if info_label == 'diagnosis':
+        return read_ukbb_diagnosis(data_file)
 
     # compile meta data and construct id in the datafile (fid)
     # format: f.<id>.<instance>.0
