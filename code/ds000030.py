@@ -2,7 +2,7 @@
 
 * the UCLA Consortium for Neuropsychiatric Phenomics LA5c Study
 
-Author: Natasha Clarke; last edit 2024-02-14
+Author: Natasha Clarke; last edit 2024-03-26
 
 All input stored in `data/ds000030` folder. The content of `data` is not
 included in the repository.
@@ -48,23 +48,55 @@ metadata = {
 }
 
 
-def process_data(csv_file_p, output_p, metadata):
-    # Load the CSV
-    df = pd.read_csv(csv_file_p)
+def process_pheno(df):
+    # Remove sub- from participant id
+    df["participant_id"] = df["participant_id"].str.replace("sub-", "", regex=False)
 
     # Process the data
     df["age"] = df["age"].astype(float)
     df["sex"] = df["gender"].map({"F": "female", "M": "male"})
     df["site"] = "ds000030"  # There is only one site, and no name provided
+    df["scanner"] = (
+        "siemens_trio"  # Given in https://doi.org/10.12688/f1000research.11964.2
+    )
     df["diagnosis"] = df["diagnosis"].map(
         {"CONTROL": "CON", "SCHZ": "SCHZ", "BIPOLAR": "BIPOLAR", "ADHD": "ADHD"}
     )
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
+    df = df[["participant_id", "age", "sex", "site", "diagnosis", "scanner"]]
+    return df
+
+
+def merge_cross_sectional(qc_df_filtered, pheno_df):
+    # Merge pheno information into QC, for a dataset with only one session per subject
+    merged_df = pd.merge(qc_df_filtered, pheno_df, on="participant_id", how="left")
+
+    # Handle site columns
+    merged_df.drop(columns=["site_x"], inplace=True)
+    merged_df.rename(columns={"site_y": "site"}, inplace=True)
+    return merged_df
+
+
+def process_data(root_p, metadata):
+    # Paths to data
+    file_p = root_p / "wrangling-phenotype/data/ds000030/participants.csv"
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
+    output_p = root_p / "wrangling-phenotype/outputs"
+
+    # Load the CSVs
+    df = pd.read_csv(file_p)
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+
+    # Process pheno df
+    pheno_df = process_pheno(df)
+
+    # Merge pheno with qc
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "ds000030"].copy()
+    qc_pheno_df = merge_cross_sectional(qc_df_filtered, pheno_df)
 
     # Output tsv file
-    df.to_csv(output_p / "ds000030_pheno.tsv", sep="\t", index=False)
+    qc_pheno_df.to_csv(output_p / "ds000030_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "ds000030_pheno.json", "w") as f:
@@ -75,11 +107,9 @@ def process_data(csv_file_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process ds000030 phenotype data and output to TSV and JSON"
+        description="Process ds000030 phenotype data, merge with QC and output to to TSV and JSON"
     )
-    parser.add_argument("datafile", type=Path, help="Path to the input CSV data file")
-    parser.add_argument("output", type=Path, help="Path to the output directory")
-
+    parser.add_argument("rootpath", type=Path, help="Root path to files")
     args = parser.parse_args()
 
-    process_data(args.datafile, args.output, metadata)
+    process_data(args.rootpath, metadata)
