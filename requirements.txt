@@ -1,1 +1,4 @@
+numpy
 pandas[excel]
+seaborn
+general_class_balancer @ git+https://github.com/SIMEXP/general_class_balancer@main
