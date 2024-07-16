@@ -4,7 +4,7 @@ Optionally, pass specific diagnoses.
 To run, needs:
 - TSV of pheno and qc data for each specificed dataset, generated using the corresponding script in this repo
 
-Author: Natasha Clarke; last edit 2024-03-26
+Author: Natasha Clarke; last edit 2024-07-16
 
 """
 
@@ -25,7 +25,6 @@ def create_master_df(root_p, datasets):
         "site",
         "diagnosis",
         "dataset",
-        "scanner",
         "mean_fd_raw",
         "mean_fd_scrubbed",
         "proportion_kept",
@@ -35,12 +34,13 @@ def create_master_df(root_p, datasets):
         "pass_anat_qc",
         "pass_all_qc",
         "different_func_affine",
-    ]
+    ]  # scanner
 
     master_df = pd.DataFrame()
     for dataset in datasets:
         path_template = "wrangling-phenotype/outputs/{dataset}_qc_pheno.tsv"
         df_p = root_p / path_template.format(dataset=dataset)
+        print(df_p)
         df = pd.read_csv(df_p, sep="\t", dtype={"participant_id": str})
         df = df[cols]
         master_df = pd.concat([master_df, df], ignore_index=True)
