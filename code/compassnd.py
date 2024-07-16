@@ -47,6 +47,16 @@ metadata = {
 }
 
 
+def merge_cross_sectional(qc_df_filtered, pheno_df):
+    # Merge pheno information into QC, for a dataset with only one session per subject
+    merged_df = pd.merge(qc_df_filtered, pheno_df, on="participant_id", how="left")
+
+    # Handle site columns
+    merged_df.drop(columns=["site_x"], inplace=True)
+    merged_df.rename(columns={"site_y": "site"}, inplace=True)
+    return merged_df
+
+
 def process_data(metadata):
     # Set paths
     root_p = Path("/home/neuromod")
@@ -56,11 +66,13 @@ def process_data(metadata):
     diagnosis_p = (
         root_p / "wrangling-phenotype/data/compassnd/data-2024-03-05T21_09_05.690Z.csv"
     )
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
     output_p = root_p / "wrangling-phenotype/outputs"
 
     # Load the data
     df = pd.read_csv(data_p)
     diagnosis_df = pd.read_csv(diagnosis_p)
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
 
     df.replace(".", np.nan, inplace=True)
     diagnosis_df.replace(".", np.nan, inplace=True)
@@ -110,8 +122,12 @@ def process_data(metadata):
         ["participant_id", "age", "sex", "site", "handedness", "education", "diagnosis"]
     ]
 
+    # Merge pheno with QC
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "compassnd"].copy()
+    qc_pheno_df = merge_cross_sectional(qc_df_filtered, pheno_df)
+
     # Output tsv file
-    pheno_df.to_csv(output_p / "compassnd_pheno.tsv", sep="\t", index=False)
+    qc_pheno_df.to_csv(output_p / "compassnd_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "compassnd_pheno.json", "w") as f:
