@@ -255,6 +255,68 @@ def oasis3_merge_mbi_qc(qc_pheno_df, mbi_df):
     return merged_df
 
 
+def compassnd_npi_to_mbi(df):
+
+    cols = [
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,008_delusion_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,011_hallucinations_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,014_agitation_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,017_depression_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,020_anxiety_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,023_elation_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,026_apathy_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,029_disinhibition_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,032_irritability_yn",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,035_disturbance_yn",
+    ]
+
+    df.replace(
+        ["not_answered", "refused_to_answer", "dont_know"],
+        [None, None, None],
+        inplace=True,
+    )
+    df.dropna(subset=cols, inplace=True)
+    df[cols] = df[cols].replace({"yes": 1, "no": 0})
+
+    df["decreased_motivation"] = df[
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,026_apathy_yn"
+    ]
+    df["emotional_dysregulation"] = (
+        df[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,017_depression_yn"
+        ]
+        + df[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,020_anxiety_yn"
+        ]
+        + df[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,023_elation_yn"
+        ]
+    )
+    df["impulse_dyscontrol"] = (
+        df[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,014_agitation_yn"
+        ]
+        + df[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,032_irritability_yn"
+        ]
+        + df[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,035_disturbance_yn"
+        ]
+    )
+    df["social_inappropriateness"] = df[
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,029_disinhibition_yn"
+    ]
+    df["abnormal_perception"] = (
+        df[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,008_delusion_yn"
+        ]
+        + df[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,011_hallucinations_yn"
+        ]
+    )
+    return df
+
+
 def first_session_controls(merged_df):
     # Filter for controls
     controls_df = merged_df[merged_df["diagnosis"] == "CON"]

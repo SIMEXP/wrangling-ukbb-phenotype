@@ -84,6 +84,19 @@ def process_oasis3_mbi(qc_pheno_df):
     return final_oasis3
 
 
+def process_compassnd_mbi(qc_pheno_df):
+    # Set path and load data
+    npi_p = root_p / "data/compassnd/data-2024-07-10T22_03_30.029Z.csv"
+    npi_df = pd.read_csv(npi_p)
+
+    # Filter for dataset
+    qc_pheno_df = qc_pheno_df[qc_pheno_df["dataset"] == "compassnd"]
+
+    mbi_df = util.compassnd_npi_to_mbi(npi_df)
+
+    return mbi_df
+
+
 def assign_mbi_group(row):
     if row["diagnosis"] in ["ADD"]:
         if row["mbi_status"] == 1:
@@ -167,18 +180,22 @@ if __name__ == "__main__":
     qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
     qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t", low_memory=False)
 
+    compass_mbi = process_compassnd_mbi(qc_pheno_df)
+
     # Create dfs for different diagnosis datasets
-    ad_datasets_df = create_final_ad_df(qc_pheno_df)
-    sz_datasets_df = create_final_sz_df(qc_pheno_df)
+    # ad_datasets_df = create_final_ad_df(qc_pheno_df)
+    # sz_datasets_df = create_final_sz_df(qc_pheno_df)
 
     # Concatenate the two sets of datasets
-    concat_qc_pheno_df = pd.concat(
-        [ad_datasets_df, sz_datasets_df],
-        ignore_index=True,
-    )
+    # concat_qc_pheno_df = pd.concat(
+    # [ad_datasets_df, sz_datasets_df],
+    # ignore_index=True,
+    # )
 
     # Save output
-    out_p = root_p / "outputs/final_qc_pheno.tsv"
-    concat_qc_pheno_df.to_csv(out_p, sep="\t", index=False)
+    out_p = root_p / "outputs/test.tsv"
+    compass_mbi.to_csv(out_p, sep="\t", index=False)
+    # out_p = root_p / "outputs/final_qc_pheno.tsv"
+    # concat_qc_pheno_df.to_csv(out_p, sep="\t", index=False)
 
-    print(f"Saved final_qc_pheno_df to {out_p}")
+    # print(f"Saved final_qc_pheno_df to {out_p}")
