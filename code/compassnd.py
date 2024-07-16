@@ -35,9 +35,13 @@ metadata = {
         "levels": ["unable to find the corresponding site names"],
     },
     "diagnosis": {
-        "original_field_name": "",
+        "original_field_name": "Initial_Diagnosis_Reappraisal Reappraisal_Initial_Diagnosis_Reappraisal,008_primary_diagnosis_categories",
         "description": "Diagnosis of the participant",
-        "levels": {},
+        "levels": {
+            "ADD": "alzheimer's disease dementia",
+            "CON": "control",
+            "MCI": "mild cognitive impairment",
+        },
     },
     "handedness": {
         "original_field_name": "Initial_Assessment_Screening Screening_Birth_Sex_Handedness,015_hand_preference",
@@ -116,6 +120,15 @@ def process_data(metadata):
     df["diagnosis"] = df[
         "Initial_Diagnosis_Reappraisal Reappraisal_Initial_Diagnosis_Reappraisal,008_primary_diagnosis_categories"
     ].str.replace("{@}", "_", regex=False)
+
+    # Rename some diagnoses. TO DO: replace all so consistent across datasets. For now just doing ones I need
+    df["diagnosis"] = df["diagnosis"].map(
+        {
+            "ad": "ADD",
+            "cu": "CON",
+            "mci": "MCI",
+        }
+    )
 
     # Select columns
     pheno_df = df[
