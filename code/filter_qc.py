@@ -40,7 +40,6 @@ def create_master_df(root_p, datasets):
     for dataset in datasets:
         path_template = "wrangling-phenotype/outputs/{dataset}_qc_pheno.tsv"
         df_p = root_p / path_template.format(dataset=dataset)
-        print(df_p)
         df = pd.read_csv(df_p, sep="\t", dtype={"participant_id": str})
         df = df[cols]
         master_df = pd.concat([master_df, df], ignore_index=True)
