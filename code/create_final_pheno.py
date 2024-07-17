@@ -18,7 +18,7 @@ def process_adni_mbi(qc_pheno_df):
     mbi_df = util.calculate_mbi_score(mbi_df)
     mbi_df = util.adni_select_columns(mbi_df)
 
-    # Merge mbi data with qc_pheno data
+    # Merge mbi data with qc_pheno data. Note that for controls with an mbi not in window, they are left blank which is fine
     merged_df = util.adni_merge_mbi_qc(qc_pheno_df, mbi_df)
 
     # Select scans. For controls, we take the first available scan. For MCI and ADD, take the first with an MBI score
@@ -93,8 +93,39 @@ def process_compassnd_mbi(qc_pheno_df):
     qc_pheno_df = qc_pheno_df[qc_pheno_df["dataset"] == "compassnd"]
 
     mbi_df = util.compassnd_npi_to_mbi(npi_df)
+    mbi_df = util.calculate_mbi_score(mbi_df)
+    mbi_df = util.compassnd_select_columns(mbi_df)
 
-    return mbi_df
+    # Convert age in months to years
+    mbi_df["age"] = (
+        (
+            mbi_df[
+                "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,001_Candidate_Age"
+            ]
+            / 12
+        )
+        .astype(float)
+        .round(2)
+    )
+
+    mbi_df.drop(
+        columns=[
+            "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,001_Candidate_Age"
+        ],
+        inplace=True,
+    )
+
+    # Merge mbi data with qc_pheno data
+    merged_df = util.compassnd_merge_mbi_qc(qc_pheno_df, mbi_df)
+
+    # Select scans. Find the first available session for each participant. For MCI and ADD they must have an mbi score, for controls it does not matter
+    # This approach retains multiple runs from the same session
+    control_df = util.first_session_controls(merged_df)
+    mci_add_df = util.first_session_mci_add(merged_df)
+
+    final_compassnd = pd.concat([control_df, mci_add_df], ignore_index=True)
+
+    return final_compassnd
 
 
 def assign_mbi_group(row):
@@ -124,10 +155,11 @@ def create_final_ad_df(qc_pheno_df):
     final_adni = process_adni_mbi(qc_pheno_df)
     final_cimaq = process_cimaq_mbi(qc_pheno_df)
     final_oasis3 = process_oasis3_mbi(qc_pheno_df)
+    final_compassnd = process_compassnd_mbi(qc_pheno_df)
 
     # Concatenate these Alzheimer datasets
     ad_datasets_df = pd.concat(
-        [final_adni, final_cimaq, final_oasis3],
+        [final_adni, final_cimaq, final_oasis3, final_compassnd],
         ignore_index=True,
     )
 
@@ -180,22 +212,18 @@ if __name__ == "__main__":
     qc_pheno_p = root_p / "outputs/passed_qc_master.tsv"
     qc_pheno_df = pd.read_csv(qc_pheno_p, sep="\t", low_memory=False)
 
-    compass_mbi = process_compassnd_mbi(qc_pheno_df)
-
     # Create dfs for different diagnosis datasets
-    # ad_datasets_df = create_final_ad_df(qc_pheno_df)
-    # sz_datasets_df = create_final_sz_df(qc_pheno_df)
+    ad_datasets_df = create_final_ad_df(qc_pheno_df)
+    sz_datasets_df = create_final_sz_df(qc_pheno_df)
 
     # Concatenate the two sets of datasets
-    # concat_qc_pheno_df = pd.concat(
-    # [ad_datasets_df, sz_datasets_df],
-    # ignore_index=True,
-    # )
+    concat_qc_pheno_df = pd.concat(
+        [ad_datasets_df, sz_datasets_df],
+        ignore_index=True,
+    )
 
     # Save output
-    out_p = root_p / "outputs/test.tsv"
-    compass_mbi.to_csv(out_p, sep="\t", index=False)
-    # out_p = root_p / "outputs/final_qc_pheno.tsv"
-    # concat_qc_pheno_df.to_csv(out_p, sep="\t", index=False)
+    out_p = root_p / "outputs/final_qc_pheno.tsv"
+    concat_qc_pheno_df.to_csv(out_p, sep="\t", index=False)
 
-    # print(f"Saved final_qc_pheno_df to {out_p}")
+    print(f"Saved final_qc_pheno_df to {out_p}")

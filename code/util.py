@@ -68,34 +68,33 @@ def adni_merge_mbi_qc(qc_pheno_df, mbi_df):
         qc_pheno_df["participant_id"].str.split("S").str[-1].astype(int)
     )
 
-    # Rename date field so it matches
-    mbi_df.rename(columns={"EXAMDATE": "ses"}, inplace=True)
-
     # Replace some rogue dates
-    mbi_df["ses"] = mbi_df["ses"].replace("0012-02-14", "2012-02-14")
-    mbi_df["ses"] = mbi_df["ses"].replace("0013-05-06", "2013-05-06")
-    mbi_df["ses"] = mbi_df["ses"].replace("0013-10-28", "2013-10-28")
+    mbi_df["EXAMDATE"] = mbi_df["EXAMDATE"].replace("0012-02-14", "2012-02-14")
+    mbi_df["EXAMDATE"] = mbi_df["EXAMDATE"].replace("0013-05-06", "2013-05-06")
+    mbi_df["EXAMDATE"] = mbi_df["EXAMDATE"].replace("0013-10-28", "2013-10-28")
 
     # Convert sessions to datetime
     qc_pheno_df["ses"] = pd.to_datetime(qc_pheno_df["ses"])
-    mbi_df["ses"] = pd.to_datetime(mbi_df["ses"])
+    mbi_df["EXAMDATE"] = pd.to_datetime(mbi_df["EXAMDATE"])
 
     # Ensure ordered by session
     qc_pheno_df = qc_pheno_df.sort_values(by=["ses"])
-    mbi_df = mbi_df.dropna(subset=["ses"])  # Since some were missing
-    mbi_df = mbi_df.sort_values(by=["ses"])
+    mbi_df = mbi_df.dropna(subset=["EXAMDATE"])  # Since some were missing
+    mbi_df = mbi_df.sort_values(by=["EXAMDATE"])
 
-    # Merge to get nearest mbi result within 6 months
+    # Merge on session
     merged_df = pd.merge_asof(
         qc_pheno_df,
         mbi_df,
         by="RID",
-        on="ses",
+        left_on="ses",
+        right_on="EXAMDATE",
         direction="nearest",
         tolerance=pd.Timedelta(days=183),
     )
 
     merged_df = merged_df.drop("RID", axis=1)
+    merged_df = merged_df.drop("EXAMDATE", axis=1)
 
     return merged_df
 
@@ -159,6 +158,7 @@ def cimaq_select_columns(df):
 
 
 def cimaq_merge_mbi_qc(qc_pheno_df, mbi_df):
+    # TO DO: instead of renaming use right_by etc
     qc_pheno_df = qc_pheno_df.copy()
     mbi_df = mbi_df.copy()
 
@@ -222,6 +222,7 @@ def oasis3_select_columns(df):
 
 
 def oasis3_merge_mbi_qc(qc_pheno_df, mbi_df):
+    # TO DO: instead of renaming use right_by etc
     qc_pheno_df = qc_pheno_df.copy()
     mbi_df = mbi_df.copy()
 
@@ -315,6 +316,49 @@ def compassnd_npi_to_mbi(df):
         ]
     )
     return df
+
+
+def compassnd_select_columns(df):
+    columns = [
+        "Identifiers",
+        "Clinical_Assessment PI_Neuropsychiatric_Inventory_Questionnaire,001_Candidate_Age",
+        "decreased_motivation",
+        "emotional_dysregulation",
+        "impulse_dyscontrol",
+        "social_inappropriateness",
+        "abnormal_perception",
+        "mbi_total_score",
+        "mbi_status",
+    ]
+    df = df[columns].copy()
+    return df
+
+
+def compassnd_merge_mbi_qc(qc_pheno_df, mbi_df):
+    qc_pheno_df = qc_pheno_df.copy()
+    mbi_df = mbi_df.copy()
+
+    # Ensure ordered by age
+    qc_pheno_df = qc_pheno_df.sort_values(by=["age"])
+    mbi_df = mbi_df.sort_values(by=["age"])
+
+    # Merge dfs with 6 month tolerance
+    merged_df = pd.merge_asof(
+        qc_pheno_df,
+        mbi_df,
+        left_by="participant_id",
+        right_by="Identifiers",
+        on="age",
+        direction="nearest",
+        tolerance=0.5,
+    )
+
+    merged_df.drop(
+        columns=["Identifiers"],
+        inplace=True,
+    )
+
+    return merged_df
 
 
 def first_session_controls(merged_df):
