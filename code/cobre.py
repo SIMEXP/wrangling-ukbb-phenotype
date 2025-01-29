@@ -1,6 +1,6 @@
 """Load COBRE data and extract demographic information.
 
-Author: Natasha Clarke; last edit 2024-02-13
+Author: Natasha Clarke; last edit 2024-03-26
 
 All input stored in `data/cobre` folder. The content of `data` is not
 included in the repository.
@@ -14,6 +14,7 @@ import pandas as pd
 import json
 import argparse
 from pathlib import Path
+
 
 # Define metadata
 metadata = {
@@ -39,30 +40,76 @@ metadata = {
         "description": "Diagnosis of the participant",
         "levels": {"CON": "control", "SCHZ": "schizophrenia"},
     },
+    "handedness": {
+        "original_field_name": "Handedness",
+        "description": "Dominant hand of the participant",
+        "levels": {"right": "right", "left": "left", "ambidextrous": "ambidextrous"},
+    },
 }
 
 
-def process_data(csv_file_p, output_p, metadata):
-    # Load the CSV and filter out any subjects who disenrolled
-    df = pd.read_csv(csv_file_p, index_col=0)
-    df = df[df["Current Age"] != "Disenrolled"]
+def process_pheno(df):
+    # Add name for id column
+    df.rename(columns={df.columns[0]: "participant_id"}, inplace=True)
 
-    # Reset the index to make it a column, and rename it
-    df.reset_index(inplace=True)
-    df = df.rename(columns={df.columns[0]: "participant_id"})
+    # Filter out any subjects who disenrolled (there is no pheno data for them)
+    df = df[df["Current Age"] != "Disenrolled"].copy()
 
     # Process the data
     df["participant_id"] = df["participant_id"].astype(str)
     df["age"] = df["Current Age"].astype(float)
     df["sex"] = df["Gender"].map({"Female": "female", "Male": "male"})
     df["site"] = "cobre"  # There is only one site, and no name provided
+    df["scanner"] = "siemens_triotim"  # Given in COBRE_parameters_mprage.csv
     df["diagnosis"] = df["Subject Type"].map({"Control": "CON", "Patient": "SCHZ"})
+    df["handedness"] = df["Handedness"].map(
+        {"Right": "right", "Left": "left", "Both": "ambidextrous"}
+    )
 
     # Select columns
-    df = df[["participant_id", "age", "sex", "site", "diagnosis"]]
+    df = df[
+        [
+            "participant_id",
+            "age",
+            "sex",
+            "site",
+            "diagnosis",
+            "handedness",
+            "scanner",
+        ]
+    ]
+    return df
+
+
+def merge_cross_sectional(qc_df_filtered, pheno_df):
+    # Merge pheno information into QC, for a dataset with only one session per subject
+    merged_df = pd.merge(qc_df_filtered, pheno_df, on="participant_id", how="left")
+
+    # Handle site columns
+    merged_df.drop(columns=["site_x"], inplace=True)
+    merged_df.rename(columns={"site_y": "site"}, inplace=True)
+    return merged_df
+
+
+def process_data(root_p, metadata):
+    # Path to data
+    file_p = root_p / "wrangling-phenotype/data/cobre/COBRE_phenotypic_data.csv"
+    qc_file_p = root_p / "qc_output/rest_df.tsv"
+    output_p = root_p / "wrangling-phenotype/outputs"
+
+    # Load the CSVs
+    df = pd.read_csv(file_p, dtype=str)
+    qc_df = pd.read_csv(qc_file_p, sep="\t", low_memory=False)
+
+    # Process pheno df
+    pheno_df = process_pheno(df)
+
+    # Merge pheno with qc
+    qc_df_filtered = qc_df.loc[qc_df["dataset"] == "cobre"].copy()
+    qc_pheno_df = merge_cross_sectional(qc_df_filtered, pheno_df)
 
     # Output tsv file
-    df.to_csv(output_p / "cobre_pheno.tsv", sep="\t", index=False)
+    qc_pheno_df.to_csv(output_p / "cobre_qc_pheno.tsv", sep="\t", index=False)
 
     # Output metadata to json
     with open(output_p / "cobre_pheno.json", "w") as f:
@@ -73,11 +120,9 @@ def process_data(csv_file_p, output_p, metadata):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Process COBRE phenotype data and output to to TSV and JSON"
+        description="Process COBRE phenotype data, merge with QC and output to to TSV and JSON"
     )
-    parser.add_argument("datafile", type=Path, help="Path to the input CSV data file")
-    parser.add_argument("output", type=Path, help="Path to the output directory")
-
+    parser.add_argument("rootpath", type=Path, help="Root path to files")
     args = parser.parse_args()
 
-    process_data(args.datafile, args.output, metadata)
+    process_data(args.rootpath, metadata)
