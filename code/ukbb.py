@@ -315,6 +315,6 @@ if __name__ == '__main__':
             df = passed_qc.loc[subjects, :]
             fig, axes = plt.subplots(1, 4, figsize=(20, 5))
             fig.suptitle(f"Confound blanced sample (N={len(subjects)}): " + curated_meta[d]['instance'][1]['description'])
-            for ax, c in zip(axes, ['sex', 'age', 'mean_fd_raw', 'proportion_kept']):
+            for ax, c in zip(axes, confounds):
                 sns.histplot(x=c, data=df, hue=d, kde=True, ax=ax)
             fig.savefig(output_dir / f'distribution_balanced_sample_{d}.png')
